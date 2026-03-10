@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install -D tailwindcss@3.14.0 postcss autoprefixer)",
+      "Bash(npm install -D tailwindcss@latest postcss autoprefixer)",
+      "Bash(npx tailwindcss init -p)",
+      "Bash(npm list tailwindcss)",
+      "Bash(npm install -D tailwindcss@3.4.17 postcss autoprefixer)",
+      "Bash(npm install react-router-dom)",
+      "Bash(npm run:*)",
+      "Bash(dir C:\\\\react-projects\\\\Codingclub\\\\src\\\\assets:*)",
+      "Bash(start:*)",
+      "Bash(curl:*)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
