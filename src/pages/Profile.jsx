@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import ImageLoader, { SmallImageLoader } from '../components/ImageLoader';
 import { Calendar, User, Phone, Mail, Lock, Edit2, Save, X, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 
 const roleColors = {
@@ -82,10 +83,7 @@ export default function Profile() {
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Foydalanuvchi ma'lumotlari yuklanmoqda...</p>
-        </div>
+        <ImageLoader size={50} text="Foydalanuvchi ma'lumotlari yuklanmoqda..." />
       </div>
     );
   }
@@ -265,7 +263,7 @@ export default function Profile() {
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <SmallImageLoader size={20} />
                         Saqlanmoqda...
                       </>
                     ) : (

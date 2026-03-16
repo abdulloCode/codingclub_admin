@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
+import ImageLoader, { SmallImageLoader } from '../components/ImageLoader';
 import {
   Users,
   GraduationCap,
@@ -105,7 +106,7 @@ export default function Reports() {
             disabled={loading}
           >
             {loading ? (
-              <RefreshCw size={18} className="animate-spin" />
+              <SmallImageLoader size={18} />
             ) : (
               <RefreshCw size={18} />
             )}
@@ -147,10 +148,7 @@ export default function Reports() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <RefreshCw size={40} className="text-blue-600 animate-spin mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">Ma\'lumotlar yuklanmoqda...</p>
-            </div>
+            <ImageLoader size={50} text="Ma'lumotlar yuklanmoqda..." />
           </div>
         ) : (
           <>

@@ -13,7 +13,6 @@ export const AuthProvider = ({ children }) => {
       setIsLoading(false);
       return;
     }
-
     try {
       const response = await apiService.getProfile();
       setUser(response.user || response.admin || response);
@@ -30,33 +29,45 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, [checkAuth]);
 
+  // ✅ Backend: POST /api/auth/login → { phone?, email?, password }
   const login = async (phone, password) => {
     const res = await apiService.login({ phone, password });
+    console.log("Login response:", res);
+    console.log("Setting user:", res.user || res.admin);
     setUser(res.user || res.admin);
     return res;
   };
 
-  const register = async (name, phone, password) => {
-    const res = await apiService.register({ name, phone, password });
+  // ✅ Backend: POST /api/auth/register → { phone, password, name?, educationCenterName? }
+  const register = async (name, phone, password, educationCenterName) => {
+    const res = await apiService.register({ name, phone, password, educationCenterName });
+    console.log("Register response:", res);
+    console.log("Setting user:", res.user || res.admin);
     setUser(res.user || res.admin);
     return res;
   };
 
-  const logout = () => {
-    apiService.clearToken();
-    setUser(null);
+  // ✅ Backend: POST /api/auth/logout
+  const logout = async () => {
+    try {
+      await apiService.logout();
+    } catch (err) {
+      console.error('Logout xatolik:', err);
+    } finally {
+      setUser(null);
+    }
   };
 
+  // ✅ Backend: PUT /api/auth/me
   const updateProfile = async (updateData) => {
     try {
       const res = await apiService.updateProfile(updateData);
       const updatedUser = res.user || res.admin || res;
       setUser(updatedUser);
-      
       return updatedUser;
     } catch (error) {
       console.error("Profilni yangilashda xatolik:", error);
-      throw error; 
+      throw error;
     }
   };
 
@@ -67,8 +78,8 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    updateProfile, 
-    checkAuth
+    updateProfile,
+    checkAuth,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

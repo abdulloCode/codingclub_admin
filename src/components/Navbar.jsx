@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import img from '../assets/image.png';
+import { SmallImageLoader } from '../components/ImageLoader';
 import {
   Home,
   Users,
@@ -34,7 +34,7 @@ const Navbar = () => {
   }, []);
 
   const menuItems = [
-    { name: 'Bosh sahifa', path: '/profile', icon: Home },
+    { name: 'Bosh sahifa', path: '/admin-panel', icon: Home },
     { name: "O'qituvchilar", path: '/teachers', icon: Users },
     { name: "O'quvchilar", path: '/students', icon: GraduationCap },
     { name: 'Guruhlar', path: '/groups', icon: Layers },
@@ -99,7 +99,7 @@ const Navbar = () => {
           <div className="flex items-center gap-2">
         {isRefreshing && (
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full text-xs font-medium animate-pulse">
-                <RefreshCw size={14} className="animate-spin" />
+                <SmallImageLoader size={14} />
                 <span>Yangilanmoqda</span>
               </div>
             )}

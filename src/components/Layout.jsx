@@ -1,13 +1,13 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
-import Profile from './Profile';
-import Settings from './Settings';
-import Reports from './Reports';
-import Teachers from './Teachers';
-import Student from './student';
-import Groups from './Groups';
-import Courses from './Courses';
-import AdminPanel from './AdminPanel';
+import Profile from '../pages/Profile';
+import Settings from '../pages/Settings';
+import Reports from '../pages/Reports';
+import Teachers from '../pages/Teachers';
+import Student from '../pages/Student';
+import Groups from '../pages/Groups';
+import Courses from '../pages/Courses';
+import AdminPanel from '../pages/AdminPanel';
 
 export default function Layout() {
   const location = useLocation();

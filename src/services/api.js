@@ -6,81 +6,81 @@ class ApiService {
     this.refreshPromise = null;
   }
 
+  // ── Token Management ──────────────────────────────────────
   getToken() { return localStorage.getItem('accessToken'); }
   setToken(token) { if (token) localStorage.setItem('accessToken', token); }
   clearToken() {
     localStorage.removeItem('accessToken');
+    // Refresh tokenni cookie'dan tozalash (agar server httpOnly ishlatmasa)
     document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
   }
 
+  // ── Core Request Logic ────────────────────────────────────
   async request(endpoint, options = {}) {
     const token = this.getToken();
     const method = (options.method || 'GET').toUpperCase();
+    const headers = new Headers(options.headers || {});
 
-    // Faqat POST, PUT, PATCH, DELETE requestlar uchun Content-Type qo'shamiz
-    const headers = new Headers();
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
+    // Avtomatik Authorization headerini qo'shish
+    if (token) headers.set('Authorization', `Bearer ${token}`);
 
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    // Agar body bo'lsa va u FormData bo'lmasa, Content-Type o'rnatamiz
+    if (options.body && !(options.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json');
     }
 
-    // GET requestlar uchun hech qanday Content-Type qo'shmaydi
+    // Tarmoq holatini tekshirish
+    if (!navigator.onLine) {
+      throw new Error('Internet aloqasi yo\'q. Iltimos, tarmoqni tekshiring.');
+    }
 
     try {
-      console.log(`🔵 API Request: ${method} ${API_BASE_URL}${endpoint}`);
-      if (options.body) {
-        console.log('📤 Request Body:', JSON.parse(options.body));
-      }
+      console.log(`🔵 ${method}: ${endpoint}`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 soniya timeout
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: method,
-        headers: headers,
-        ...options
+        ...options,
+        method,
+        headers,
+        signal: controller.signal,
+        credentials: 'include', // Refresh token cookie'lari uchun shart
       });
 
-      console.log(`🟢 API Response Status: ${response.status} ${response.statusText}`);
+      clearTimeout(timeoutId);
 
-      if (response.status === 401 && !endpoint.includes('/api/auth/refresh')) {
-        console.warn('⚠️ Token expired, refreshing...');
+      // Auth endpointlari ro'yxati
+      const isAuthEndpoint = ['/api/auth/login', '/api/auth/refresh', '/api/auth/register']
+        .some(p => endpoint.includes(p));
+
+      // 401 xatosi va tokenni yangilash
+      if (response.status === 401 && !isAuthEndpoint) {
         return this.handleTokenRefresh(endpoint, options);
       }
 
-      // 500 xatoliklarini maxsus ko'rsatish
-      if (response.status === 500) {
-        console.error('🔴 Server Error 500 for:', endpoint);
-        const errorData = await response.json().catch(() => ({}));
-        console.error('🔴 Error Data:', errorData);
-        throw new Error(errorData.message || errorData.error || 'Serverda xatolik yuz berdi (500). Backend endpointini tekshiring.');
-      }
-
-      // 400 va 404 xatoliklarini ko'rsatish
-      if (response.status === 400 || response.status === 404) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || errorData.error || 'Xatolik yuz berdi';
-        console.error('🟠 Validation Error:', errorMessage);
-        console.error('🟠 Error Details:', errorData);
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json().catch(() => ({}));
-      console.log('✅ API Response Data:', data);
-
+      // Xatoliklarni tekshirish
       if (!response.ok) {
-        const errorMessage = data.message || data.error || 'Xatolik yuz berdi';
-        console.error('❌ API Error:', errorMessage);
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Server xatosi: ${response.status}`);
       }
 
-      return data;
+      if (response.status === 204) return null;
+      return await response.json();
+
     } catch (error) {
       console.error(`💥 API Error (${endpoint}):`, error.message);
+
+      if (error.name === 'AbortError') {
+        throw new Error('So\'rov muddati o\'tdi (Timeout).');
+      } else if (error.message === 'Failed to fetch' || error instanceof TypeError) {
+        throw new Error('Server bilan bog\'lanib bo\'lmadi. Backend yoniqligini tekshiring.');
+      }
       throw error;
     }
   }
 
+  // ── Refresh Token Logic ───────────────────────────────────
   async handleTokenRefresh(endpoint, options) {
     if (!this.isRefreshing) {
       this.isRefreshing = true;
@@ -89,103 +89,70 @@ class ApiService {
         this.refreshPromise = null;
       });
     }
+
     try {
       const res = await this.refreshPromise;
-      if (res && res.accessToken) {
+      if (res?.accessToken) {
         this.setToken(res.accessToken);
-        return this.request(endpoint, options);
+        return this.request(endpoint, options); // So'rovni yangi token bilan takrorlash
       }
     } catch (err) {
       this.clearToken();
       window.location.href = '/login';
-      throw new Error('Sessiya tugadi');
+      throw new Error('Sessiya tugadi, iltimos qayta kiring');
     }
   }
 
-  // --- Yangilangan Metodlar ---
+  // ── Auth Endpoints ────────────────────────────────────────
   async register(data) {
     const res = await this.request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) });
-    if (res.accessToken) this.setToken(res.accessToken);
+    if (res?.accessToken) this.setToken(res.accessToken);
     return res;
   }
 
   async login(data) {
     const res = await this.request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
-    if (res.accessToken) this.setToken(res.accessToken);
+    if (res?.accessToken) this.setToken(res.accessToken);
     return res;
   }
 
-  async getProfile() { return this.request('/api/auth/me'); }
-
-  async updateProfile(data) {
-    // Backend endpointingizga qarab '/api/auth/profile' yoki '/api/auth/me'
-    return this.request('/api/auth/me', { 
-      method: 'PUT', 
-      body: JSON.stringify(data) 
-    });
+  async getProfile()        { return this.request('/api/auth/me'); }
+  async updateProfile(data) { return this.request('/api/auth/me', { method: 'PUT', body: JSON.stringify(data) }); }
+  async refresh()           { return this.request('/api/auth/refresh', { method: 'POST' }); }
+  async logout() {
+    try { await this.request('/api/auth/logout', { method: 'POST' }); }
+    finally { this.clearToken(); }
   }
 
-  async refresh() { return this.request('/api/auth/refresh', { method: 'POST' }); }
+  // ── Students & Teachers ───────────────────────────────────
+  async getStudents()           { return this.request('/api/students'); }
+  async getStudent(id)          { return this.request(`/api/students/${id}`); }
+  async createStudent(data)      { return this.request('/api/students', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateStudent(id, data)  { return this.request(`/api/students/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async deleteStudent(id)       { return this.request(`/api/students/${id}`, { method: 'DELETE' }); }
 
-  // --- Guruhlar Metodlari ---
-  async getGroups() { return this.request('/api/groups'); }
-  async getGroup(id) { return this.request(`/api/groups/${id}`); }
-  async createGroup(data) { return this.request('/api/groups', { method: 'POST', body: JSON.stringify(data) }); }
-  async updateGroup(id, data) { return this.request(`/api/groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
-  async deleteGroup(id) { return this.request(`/api/groups/${id}`, { method: 'DELETE' }); }
+  async getTeachers()           { return this.request('/api/teachers'); }
+  async getTeacher(id)          { return this.request(`/api/teachers/${id}`); }
+  async createTeacher(data)      { return this.request('/api/teachers', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateTeacher(id, data)  { return this.request(`/api/teachers/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async deleteTeacher(id)       { return this.request(`/api/teachers/${id}`, { method: 'DELETE' }); }
 
-  // --- Guruh O'quvchilari ---
-  async addStudentToGroup(groupId, studentId) {
-    const response = await this.request(`/api/groups/${groupId}/students`, { method: 'POST', body: JSON.stringify({ studentId }) });
-    return response;
-  }
-  async removeStudentFromGroup(groupId, studentId) {
-    const response = await this.request(`/api/groups/${groupId}/students/${studentId}`, { method: 'DELETE' });
-    return response;
-  }
+  // ── Courses & Groups ──────────────────────────────────────
+  async getCourses()            { return this.request('/api/courses'); }
+  async getGroups()             { return this.request('/api/groups'); }
+  async getGroup(id)            { return this.request(`/api/groups/${id}`); }
+  async createGroup(data)       { return this.request('/api/groups', { method: 'POST', body: JSON.stringify(data) }); }
+  
+  // ── Homework & Attendance ─────────────────────────────────
+  async getHomeworks()          { return this.request('/api/homework'); }
+  async submitHomework(id, c)   { return this.request(`/api/homework/${id}/submit`, { method: 'POST', body: JSON.stringify({ content: c }) }); }
+  async getAttendances()        { return this.request('/api/attendance'); }
 
-  async setDefaultStudent(groupId, studentId, isDefault) {
-    return this.request(`/api/groups/${groupId}/students/${studentId}/default`, { method: 'PATCH', body: JSON.stringify({ isDefault }) });
-  }
-  async getGroupStudents(groupId) {
-    return this.request(`/api/groups/${groupId}/students`, { method: 'GET' });
-  }
-
-  // --- Rolga asoslangan Guruhlar ---
-  async getMyGroup() {
-    return this.request('/api/groups/me/group');
-  }
-  async getMyGroups() {
-    return this.request('/api/groups/me/groups');
-  }
-
-  // --- O'qituvchilar Metodlari ---
-  async getTeachers() { return this.request('/api/teachers'); }
-  async createTeacher(data) { return this.request('/api/teachers', { method: 'POST', body: JSON.stringify(data) }); }
-  async updateTeacher(id, data) { return this.request(`/api/teachers/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
-  async deleteTeacher(id) { return this.request(`/api/teachers/${id}`, { method: 'DELETE' }); }
-
-  // --- O'quvchilar Metodlari ---
-  async getStudents() { return this.request('/api/students'); }
-  async createStudent(data) { return this.request('/api/students', { method: 'POST', body: JSON.stringify(data) }); }
-  async updateStudent(id, data) { return this.request(`/api/students/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
-  async deleteStudent(id) { return this.request(`/api/students/${id}`, { method: 'DELETE' }); }
-
-  // --- Kurslar Metodlari ---
-  async getCourses() { return this.request('/api/courses'); }
-  async getCourse(id) { return this.request(`/api/courses/${id}`); }
-  async createCourse(data) {
-    const response = await this.request('/api/courses', { method: 'POST', body: JSON.stringify(data) });
-    return response;
-  }
-  async updateCourse(id, data) {
-    const response = await this.request(`/api/courses/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-    return response;
-  }
-  async deleteCourse(id) { return this.request(`/api/courses/${id}`, { method: 'DELETE' }); }
-
-  // --- Dashboard Metodlari ---
-  async getDashboard() { return this.request('/api/dashboard'); }
+  // ── Articles (Blog) ───────────────────────────────────────
+  async getArticles(params = '') { return this.request(`/api/admin/articles${params}`); }
+  async createArticle(data)      { return this.request('/api/admin/articles', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateArticle(id, data)  { return this.request(`/api/admin/articles/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async deleteArticle(id)        { return this.request(`/api/admin/articles/${id}`, { method: 'DELETE' }); }
 }
 
 export const apiService = new ApiService();
