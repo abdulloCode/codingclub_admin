@@ -2,24 +2,35 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiService } from '../services/api';
-import ImageLoader from '../components/ImageLoader';
 import {
   FileText, CheckCircle, Plus, Trash2, RotateCw,
-  Calendar, BookOpen, Users, Layers, Clock
+  Calendar, BookOpen, Users, Layers, Clock,
+  Menu, X, Bell, Search, Settings,
+  Home, LogOut, ChevronDown, TrendingUp,
+  Award, Target, AlertTriangle, Play, Pause
 } from 'lucide-react';
+
+const BRAND = '#6366f1';
+const BRAND_LIGHT = '#818cf8';
+const BRAND_DARK = '#4f46e5';
 
 export default function TeacherPanel() {
   const { user } = useAuth();
-  const { isDarkMode } = useTheme();
-  const [activeSection, setActiveSection] = useState('assignments');
+  const { isDarkMode: D } = useTheme();
+  const [activeSection, setActiveSection] = useState('dashboard');
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [assignments, setAssignments] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [attendanceStats, setAttendanceStats] = useState({
+    total: 0, present: 0, absent: 0, late: 0, rate: 0,
+  });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Tablar konfiguratsiyasi - faqat teacher specific
   const sectionTabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'assignments', label: 'Topshiriqlar', icon: FileText },
     { id: 'grading', label: 'Baholash', icon: CheckCircle },
     { id: 'groups', label: 'Guruhlar', icon: Layers },
@@ -27,11 +38,7 @@ export default function TeacherPanel() {
 
   // Form state for creating homework
   const [form, setForm] = useState({
-    title: '',
-    description: '',
-    groupId: '',
-    dueDate: '',
-    points: 100
+    title: '', description: '', groupId: '', dueDate: '', points: 100
   });
   const [modalLoading, setModalLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -39,11 +46,12 @@ export default function TeacherPanel() {
   const loadAssignments = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getHomeworks();
+      const data = await apiService.getHomeworks().catch(() => []);
       const hw = Array.isArray(data) ? data : data?.homeworks || data?.data || [];
       setAssignments(hw);
     } catch (err) {
       console.error('Yuklashda xatolik:', err);
+      setAssignments([]);
     } finally {
       setLoading(false);
     }
@@ -62,9 +70,8 @@ export default function TeacherPanel() {
   const loadGroups = async () => {
     try {
       const data = await apiService.getMyTeacherGroups();
-      console.log('Teacher groups response:', data); // Debug uchun
+      console.log('Teacher groups response:', data);
 
-      // Guruhlar ma'lumotlarini to'g'ri ishlash
       let grps = [];
       if (Array.isArray(data)) {
         grps = data;
@@ -74,11 +81,9 @@ export default function TeacherPanel() {
         grps = data.data;
       }
 
-      // Faqat shu o'qituvchiga tegishli guruhlarni ko'rsatish
       const teacherId = user?.id || user?.userId;
       if (teacherId) {
         grps = grps.filter(group => {
-          // Guruh teacherId-si shu o'qituvchi ID-siga teng bo'lsa
           return group.teacherId === teacherId || group.teacher?.id === teacherId;
         });
       }
@@ -87,7 +92,41 @@ export default function TeacherPanel() {
       setGroups(grps);
     } catch (err) {
       console.error('Guruhlarni yuklashda xatolik:', err);
-      setGroups([]); // Xatolik bo'lsa bo'sh massiv qo'yish
+      setGroups([]);
+    }
+  };
+
+  const loadTeacherAttendance = async () => {
+    try {
+      const allAttendance = [];
+
+      if (groups.length > 0) {
+        for (const group of groups) {
+          try {
+            const data = await apiService.getGroupAttendanceRecords(group.id);
+            const records = Array.isArray(data) ? data : data?.data || [];
+            allAttendance.push(...records);
+          } catch (err) {
+            console.log(`Guruh ${group.id} davomatini yuklashda xatolik:`, err);
+          }
+        }
+      }
+
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+      const todayAttendance = allAttendance.filter(r => r.date?.startsWith(todayStr));
+      const totalToday = todayAttendance.length;
+      const presentToday = todayAttendance.filter(r => r.status === 'present' || r.status === 'late').length;
+      const absentToday = todayAttendance.filter(r => r.status === 'absent').length;
+      const lateToday = todayAttendance.filter(r => r.status === 'late').length;
+      const rate = totalToday > 0 ? Math.round((presentToday / totalToday) * 100) : 0;
+
+      setAttendanceStats({
+        total: totalToday, present: presentToday, absent: absentToday, late: lateToday, rate,
+      });
+    } catch (err) {
+      console.error('Davomat statistikasini yuklashda xatolik:', err);
     }
   };
 
@@ -95,6 +134,12 @@ export default function TeacherPanel() {
     loadAssignments();
     loadGroups();
   }, []);
+
+  useEffect(() => {
+    if (groups.length > 0) {
+      loadTeacherAttendance();
+    }
+  }, [groups]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -104,11 +149,7 @@ export default function TeacherPanel() {
       alert('Topshiriq muvaffaqiyatli yaratildi!');
       setShowCreateModal(false);
       setForm({
-        title: '',
-        description: '',
-        groupId: '',
-        dueDate: '',
-        points: 100
+        title: '', description: '', groupId: '', dueDate: '', points: 100
       });
       loadAssignments();
     } catch (err) {
@@ -145,457 +186,1356 @@ export default function TeacherPanel() {
     }
   };
 
-  const BRAND = '#6366f1'; // Indigo for teacher
-  const D = isDarkMode;
-
-  const bg   = D ? '#000000' : '#f5f5f7';
-  const card = D ? '#1c1c1e' : '#ffffff';
-  const bord = D ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)';
-  const tx   = D ? '#f5f5f7' : '#1d1d1f';
-  const mu   = D ? 'rgba(245,245,247,0.5)' : 'rgba(29,29,31,0.6)';
+  const bg   = D ? '#0a0a0f' : '#f8fafc';
+  const card = D ? '#1e1e24' : '#ffffff';
+  const bord = D ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+  const tx   = D ? '#f1f5f9' : '#1e293b';
+  const mu   = D ? 'rgba(255,255,255,0.6)' : 'rgba(30,41,59,0.5)';
+  const bgSec = D ? '#16181f' : '#f1f5f9';
+  const bgItem = D ? '#1e1e24' : '#ffffff';
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-black text-white' : 'bg-gray-50 text-gray-900'} transition-colors duration-300 p-6 font-sans`}>
-      <div className="max-w-7xl mx-auto">
-        {/* Tab Navigation - Faqat teacher specific */}
-        <div className={`flex gap-2 p-1.5 rounded-2xl mb-6 w-fit ${isDarkMode ? 'bg-white/10' : 'bg-gray-200/60'}`}>
-          {sectionTabs.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => {
-                setActiveSection(section.id);
-                // Baholashga o'tganda topshiriqlarni yuklash
-                if (section.id === 'grading' && !selectedAssignment) {
-                  setActiveSection('assignments');
-                }
-              }}
-              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 relative overflow-hidden ${
-                activeSection === section.id
-                  ? `bg-${BRAND === '#6366f1' ? 'indigo' : 'blue'}-600 text-white shadow-lg shadow-indigo-500/30`
-                  : isDarkMode
-                  ? 'text-gray-300 hover:bg-white/10'
-                  : 'text-gray-600 hover:bg-white hover:shadow-sm'
-              }`}
-              style={activeSection === section.id ? { background: BRAND, boxShadow: `0 4px 12px ${BRAND}40` } : {}}
-            >
-              <section.icon size={18} />
-              <span className="hidden sm:inline">{section.label}</span>
-            </button>
-          ))}
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+        * {
+          box-sizing: border-box;
+          font-family: 'Plus Jakarta Sans', sans-serif;
+          margin: 0;
+          padding: 0;
+        }
+
+        body {
+          background: ${bg};
+          color: ${tx};
+        }
+
+        .scroll-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scroll-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        .smooth-scroll {
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
+        .animate-fade {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        .animate-slide {
+          animation: slideIn 0.3s ease-out forwards;
+        }
+
+        .card-hover {
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 40px rgba(99, 102, 241, 0.15);
+        }
+
+        .btn-primary {
+          background: linear-gradient(135deg, ${BRAND}, ${BRAND_LIGHT});
+          transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+          background: linear-gradient(135deg, ${BRAND_LIGHT}, ${BRAND_DARK});
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+          background: transparent;
+          border: 1px solid ${bord};
+          color: ${tx};
+          transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+          background: ${D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)'};
+        }
+
+        .input-field {
+          background: ${D ? '#2a2a35' : '#f8fafc'};
+          border: 1px solid ${bord};
+          color: ${tx};
+          transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+          border-color: ${BRAND};
+          box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+          outline: none;
+        }
+
+        .sidebar-item {
+          transition: all 0.2s ease;
+          border-left: 3px solid transparent;
+        }
+
+        .sidebar-item:hover {
+          background: ${D ? 'rgba(255,255,255,0.05)' : 'rgba(99,102,241,0.05)'};
+          border-left-color: ${BRAND};
+        }
+
+        .sidebar-item.active {
+          background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(99,102,241,0.05));
+          border-left-color: ${BRAND};
+        }
+
+        .nav-btn {
+          transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover {
+          background: ${D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)'};
+        }
+
+        .progress-bar {
+          background: ${D ? '#374151' : '#e2e8f0'};
+          border-radius: 9999px;
+          overflow: hidden;
+        }
+
+        .progress-fill {
+          background: linear-gradient(90deg, ${BRAND}, ${BRAND_LIGHT});
+          height: 100%;
+          transition: width 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+          .mobile-hidden { display: none !important; }
+          .mobile-visible { display: block !important; }
+        }
+
+        @media (min-width: 769px) {
+          .mobile-hidden { display: flex !important; }
+          .mobile-visible { display: none !important; }
+        }
+      `}</style>
+
+      <div className="min-h-screen" style={{ display: 'flex' }}>
+        {/* ──────────── SIDEBAR ───────────────────────── */}
+        <div style={{
+          width: sidebarOpen ? '280px' : '80px',
+          background: card,
+          borderRight: `1px solid ${bord}`,
+          transition: 'width 0.3s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 40,
+          overflow: 'hidden',
+        }} className="mobile-hidden">
+          {/* Logo */}
+          <div style={{
+            padding: '24px',
+            borderBottom: `1px solid ${bord}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: `linear-gradient(135deg, ${BRAND}, ${BRAND_LIGHT})`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <Users size={20} color="white" />
+            </div>
+            {sidebarOpen && (
+              <div>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: tx, margin: 0 }}>O'qituvchi</h2>
+                <p style={{ fontSize: '11px', color: mu, margin: '4px 0 0 0' }}>{user?.name || 'O\'qituvchi'}</p>
+              </div>
+            )}
+          </div>
+
+          {/* Sidebar Toggle Button */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            style={{
+              padding: '12px',
+              background: 'none',
+              border: 'none',
+              color: mu,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: `1px solid ${bord}`,
+            }}
+          >
+            {sidebarOpen ? <ChevronDown size={20} /> : <Menu size={20} />}
+          </button>
+
+          {/* Navigation Items */}
+          {sidebarOpen && (
+            <nav style={{
+              flex: 1,
+              padding: '16px 12px',
+              overflowY: 'auto',
+            }}>
+              {sectionTabs.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={`sidebar-item ${isActive ? 'active' : ''}`}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '14px 16px',
+                      borderRadius: '10px',
+                      marginBottom: '4px',
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: 'transparent',
+                      color: tx,
+                      fontSize: '14px',
+                      fontWeight: isActive ? 600 : 500,
+                    }}
+                  >
+                    <Icon size={18} />
+                    <span style={{ flex: 1, textAlign: 'left' }}>{section.label}</span>
+                    {isActive && <ChevronDown size={16} style={{ color: BRAND }} />}
+                  </button>
+                );
+              })}
+            </nav>
+          )}
+
+          {/* User Info & Logout */}
+          {sidebarOpen && (
+            <div style={{
+              padding: '16px',
+              borderTop: `1px solid ${bord}`,
+              marginTop: 'auto',
+            }}>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('accessToken');
+                  window.location.href = '/teacher-login';
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)',
+                  color: D ? '#fca5a5' : '#ef4444',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease',
+                }}
+                className="btn-secondary"
+              >
+                <LogOut size={16} />
+                Chiqish
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Main Content */}
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <ImageLoader size={50} text="Ma'lumotlar yuklanmoqda..." />
+        {/* ──────────── MAIN CONTENT ──────────────────── */}
+        <div style={{
+          flex: 1,
+          marginLeft: sidebarOpen ? '280px' : '80px',
+          background: bg,
+          transition: 'margin-left 0.3s ease',
+          minHeight: '100vh',
+        }} className="smooth-scroll">
+          {/* ──────────── TOP NAVBAR ───────────────── */}
+          <div style={{
+            position: 'sticky',
+            top: 0,
+            background: card,
+            borderBottom: `1px solid ${bord}`,
+            padding: '16px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 30,
+            transition: 'all 0.2s ease',
+          }} className="mobile-visible">
+            {/* Left */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)',
+                  border: 'none',
+                  color: tx,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+                className="mobile-hidden nav-btn"
+              >
+                <Menu size={20} />
+              </button>
+              <h1 style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: tx,
+                margin: 0,
+                letterSpacing: '-0.02em',
+              }}>
+                {activeSection === 'dashboard' && 'Dashboard'}
+                {activeSection === 'assignments' && 'Topshiriqlar'}
+                {activeSection === 'grading' && 'Baholash'}
+                {activeSection === 'groups' && 'Guruhlar'}
+              </h1>
+            </div>
+
+            {/* Right */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                position: 'relative',
+              }}>
+                <Search size={18} color={mu} />
+                <input
+                  type="text"
+                  placeholder="Qidirish..."
+                  style={{
+                    paddingLeft: '40px',
+                    paddingRight: '12px',
+                    padding: '10px 0',
+                    borderRadius: '8px',
+                    border: `1px solid ${bord}`,
+                    background: D ? '#2a2a35' : '#f8fafc',
+                    color: tx,
+                    fontSize: '13px',
+                    outline: 'none',
+                    width: '200px',
+                  }}
+                  className="input-field"
+                />
+              </div>
+              <button style={{
+                padding: '8px',
+                borderRadius: '8px',
+                background: 'transparent',
+                border: 'none',
+                color: mu,
+                cursor: 'pointer',
+                position: 'relative',
+              }}>
+                <Bell size={18} />
+                <span style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  width: '8px',
+                  height: '8px',
+                  background: '#ef4444',
+                  borderRadius: '50%',
+                  fontSize: '10px',
+                  color: 'white',
+                  fontWeight: 600,
+                }}>3</span>
+              </button>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: tx,
+                  cursor: 'pointer',
+                }}
+                className="mobile-visible nav-btn"
+              >
+                <Menu size={20} />
+              </button>
+            </div>
           </div>
-        ) : (
-          <div className={`rounded-2xl p-8 border ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white shadow-sm'}`}>
 
-            {/* Assignments Section */}
-            {activeSection === 'assignments' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                      Mening Topshiriqlarim
-                    </h2>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {assignments.length} ta topshiriq
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setShowCreateModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105"
-                    style={{ background: BRAND, color: 'white', boxShadow: `0 2px 8px ${BRAND}40` }}
-                  >
-                    <Plus size={16} />
-                    Yaratish
-                  </button>
-                </div>
-
-                {assignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className={`p-5 rounded-xl border transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${
-                      isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <h4 className={`font-bold text-base mb-2 truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {assignment.title}
-                        </h4>
-                        <div className="flex items-center gap-4 text-xs">
-                          <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${
-                            isDarkMode ? 'bg-white/10' : 'bg-white border border-gray-200'
-                          }`}>
-                            <Calendar size={14} className="text-indigo-500" />
-                            <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                              {assignment.dueDate || 'Muddat belgilanmagan'}
-                            </span>
-                          </div>
-                          <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ${
-                            isDarkMode ? 'bg-white/10' : 'bg-white border border-gray-200'
-                          }`}>
-                            <BookOpen size={14} className="text-purple-500" />
-                            <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                              {assignment.points || 100} ball
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => {
-                            setSelectedAssignment(assignment);
-                            loadSubmissions(assignment.id);
-                            setActiveSection('grading');
-                          }}
-                          className={`px-3 py-2 rounded-lg text-sm font-bold transition-all ${
-                            isDarkMode
-                              ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                              : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'
-                          }`}
-                        >
-                          Tekshirish
-                        </button>
-                        <button
-                          onClick={() => deleteAssignment(assignment.id)}
-                          className={`p-2 rounded-lg transition-all ${
-                            isDarkMode
-                              ? 'bg-red-900/30 hover:bg-red-900/50 text-red-400'
-                              : 'bg-red-100 hover:bg-red-200 text-red-600'
-                          }`}
-                          title="O'chirish"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {assignments.length === 0 && (
-                  <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mx-auto mb-4">
-                      <FileText size={32} className="text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <p className="text-lg font-semibold mb-2">Hozircha topshiriqlar yo'q</p>
-                    <p className="text-sm">Yangi topshiriq yaratish uchun "Yaratish" tugmasini bosing</p>
-                  </div>
-                )}
+          {/* ──────────── MOBILE MENU ───────────────── */}
+          {mobileMenuOpen && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              background: card,
+              borderBottom: `1px solid ${bord}`,
+              padding: '16px',
+              zIndex: 50,
+              boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+            }} className="mobile-visible">
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+              }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: tx }}>Menu</h2>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    padding: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: mu,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={24} />
+                </button>
               </div>
-            )}
-
-            {/* Grading Section */}
-            {activeSection === 'grading' && selectedAssignment && (
-              <div className="space-y-4">
-                {/* Assignment Info */}
-                <div className={`p-6 rounded-xl border ${isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h4 className={`font-bold text-lg mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                        {selectedAssignment.title}
-                      </h4>
-                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {selectedAssignment.description}
-                      </p>
-                    </div>
+              <div style={{ display: 'grid', gap: '8px' }}>
+                {sectionTabs.map((section) => {
+                  const Icon = section.icon;
+                  const isActive = activeSection === section.id;
+                  return (
                     <button
-                      onClick={() => setActiveSection('assignments')}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all ${
-                        isDarkMode
-                          ? 'bg-white/10 hover:bg-white/20 text-gray-300'
-                          : 'bg-white hover:bg-gray-50 text-gray-600 border border-gray-200'
-                      }`}
+                      key={section.id}
+                      onClick={() => {
+                        setActiveSection(section.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '16px 20px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        background: isActive ? `linear-gradient(135deg, ${BRAND}, ${BRAND_LIGHT})` : 'transparent',
+                        color: isActive ? 'white' : tx,
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        transition: 'all 0.2s ease',
+                      }}
                     >
-                      <span>← Ortga</span>
-                      </button>
-                  </div>
-                  <div className="flex gap-4 text-xs">
-                    <div className={`flex items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <Calendar size={14} />
-                      <span>Muddat: {selectedAssignment.dueDate || 'Belgilanmagan'}</span>
-                    </div>
-                    <div className={`flex items-center gap-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      <BookOpen size={14} />
-                      <span>{selectedAssignment.points || 100} ball</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Submissions */}
-                {submissions.map((submission) => (
-                  <div
-                    key={submission.id}
-                    className={`p-5 rounded-xl border transition-all duration-300 ${
-                      isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h5 className={`font-bold text-base ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                            {submission.studentName || 'O\'quvchi'}
-                          </h5>
-                          {submission.graded && (
-                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                              submission.points >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                              submission.points >= 60 ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {submission.points} ball
-                            </span>
-                          )}
-                        </div>
-                        <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Yuborilgan: {new Date(submission.submittedAt).toLocaleDateString('uz-UZ')}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className={`p-4 rounded-xl mb-4 text-sm leading-relaxed ${
-                      isDarkMode ? 'bg-white/5 border border-white/10' : 'bg-gray-50 border border-gray-200'
-                    }`}>
-                      {submission.content}
-                    </div>
-
-                    {!submission.graded && (
-                      <div className="flex gap-3">
-                        <div className="flex-1">
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            placeholder="Ball (0-100)"
-                            className={`w-full px-4 py-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
-                              isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                            }`}
-                            id={`grade-${submission.id}`}
-                          />
-                        </div>
-                        <button
-                          onClick={() => {
-                            const input = document.getElementById(`grade-${submission.id}`);
-                            if (input.value) {
-                              gradeSubmission(selectedAssignment.id, submission.id, input.value);
-                            }
-                          }}
-                          className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
-                        >
-                          Baholash
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {submissions.length === 0 && (
-                  <div className={`text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    <div className="w-16 h-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle size={32} className="text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <p className="text-lg font-semibold mb-2">Hali topshiriqlar yuborilmagan</p>
-                    <p className="text-sm">O'quvchilar topshiriq yuborishganda bu yerda ko'rinadi</p>
-                  </div>
-                )}
+                      <Icon size={18} />
+                      {section.label}
+                    </button>
+                  );
+                })}
               </div>
-            )}
+              <button
+                onClick={() => {
+                  localStorage.removeItem('accessToken');
+                  window.location.href = '/teacher-login';
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '14px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)',
+                  color: D ? '#fca5a5' : '#ef4444',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500',
+                }}
+              >
+                <LogOut size={16} />
+                Chiqish
+              </button>
+            </div>
+          </div>
+          )}
 
-            {/* Groups Section */}
-            {activeSection === 'groups' && (
-              <div>
-                <div className="mb-6">
-                  <h2 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                    Mening Guruhlarim
-                  </h2>
-                  <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {groups.length} ta guruh
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {groups.map((group) => {
-                    // O'quvchilar soni
-                    const currentStudents = group.currentStudents || 0;
-                    const maxStudents = group.maxStudents || 20;
-                    const studentsCount = group.students?.length || currentStudents;
-                    const spotsLeft = maxStudents - studentsCount;
-                    const isFull = spotsLeft <= 0;
-
-                    return (
-                      <div
-                        key={group.id}
-                        className={`p-5 rounded-xl border transition-all duration-300 hover:shadow-lg hover:scale-[1.02] ${
-                          isDarkMode ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-sm shadow-lg">
-                            {group.name?.substring(0, 2)?.toUpperCase() || 'GR'}
+          {/* ──────────── MAIN CONTENT AREA ──────────── */}
+          <div style={{ padding: '24px' }} className="smooth-scroll">
+            {loading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+                <RotateCw size={40} color={BRAND} style={{ animation: 'spin 1s linear infinite' }} />
+              </div>
+            ) : (
+              <>
+                {/* ──────────── DASHBOARD SECTION ──────────── */}
+                {activeSection === 'dashboard' && (
+                  <div style={{ animation: 'fadeIn 0.3s ease-out' }} className="animate-fade">
+                    {/* Attendance Stats */}
+                    <div style={{
+                      background: card,
+                      borderRadius: '16px',
+                      padding: '24px',
+                      border: `1px solid ${bord}`,
+                      marginBottom: '24px',
+                    }}>
+                      <h2 style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        color: tx,
+                        marginBottom: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                      }}>
+                        <Calendar size={20} color={BRAND} />
+                        Bugungi Davomat
+                      </h2>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                        gap: '16px',
+                        marginBottom: '20px',
+                      }}>
+                        {[
+                          { label: 'Keldi', value: attendanceStats.present, color: '#22c55e', icon: CheckCircle },
+                          { label: 'Kelmadi', value: attendanceStats.absent, color: '#ef4444', icon: X },
+                          { label: 'Kechikdi', value: attendanceStats.late, color: '#f59e0b', icon: Clock },
+                          { label: 'Jami', value: attendanceStats.total, color: BRAND, icon: Users },
+                        ].map(({ label, value, color, icon: Icon }) => (
+                          <div key={label} style={{
+                            padding: '20px',
+                            borderRadius: '12px',
+                            background: `${color}15`,
+                            border: `1px solid ${color}30`,
+                            textAlign: 'center',
+                          }}>
+                            <Icon size={28} style={{ color, marginBottom: '12px' }} />
+                            <p style={{
+                              fontSize: '32px',
+                              fontWeight: 700,
+                              color,
+                              margin: 0,
+                            }}>{value}</p>
+                            <p style={{
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              color: mu,
+                              margin: '4px 0 0 0',
+                            }}>{label}</p>
                           </div>
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            group.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                          }`}>
-                            {group.status === 'active' ? 'FAOL' : 'NOFAOL'}
+                        ))}
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingTop: '16px',
+                        borderTop: `1px solid ${bord}`,
+                      }}>
+                        <div>
+                          <p style={{ fontSize: '14px', fontWeight: 500, color: mu }}>Davomat foizi</p>
+                          <p style={{ fontSize: '28px', fontWeight: 700, color: tx, margin: '4px 0 0 0' }}>
+                            {attendanceStats.rate}%
+                          </p>
+                        </div>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}>
+                          <TrendingUp size={20} color={BRAND} />
+                          <span style={{ fontSize: '13px', color: mu }}>
+                            {attendanceStats.rate >= 80 ? 'A\'lo' : attendanceStats.rate >= 60 ? 'Yaxshi' : 'Yaxshilanadi'}
                           </span>
                         </div>
+                      </div>
+                    </div>
 
-                        <h4 className={`font-bold text-base mb-3 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                          {group.name}
-                        </h4>
-
-                        <div className="space-y-2 text-xs">
-                          {/* Kurs */}
-                          <div className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                            <BookOpen size={14} className="text-indigo-500" />
-                            <span className="font-medium">{group.courseTitle || group.course?.title || 'Kurs'}</span>
+                    {/* Stats Grid */}
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                      gap: '16px',
+                    }}>
+                      {/* Total Students */}
+                      <div style={{
+                        background: card,
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: `1px solid ${bord}`,
+                      }} className="card-hover">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Users size={20} color={BRAND} />
                           </div>
-
-                          {/* O'quvchilar */}
-                          <div className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                            <Users size={14} className="text-emerald-500" />
-                            <span className="font-medium">
-                              {studentsCount}/{maxStudents} o'quvchi
-                              {isFull && (
-                                <span className="ml-1 px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold">
-                                  TO'LIQ
-                                </span>
-                              )}
-                            </span>
+                          <div>
+                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Jami o'quvchilar</p>
+                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>
+                              {assignments.reduce((total, a) => total + (a.points || 100), 0)}
+                            </p>
                           </div>
+                        </div>
+                      </div>
 
-                          {/* Vaqt (agar mavjud bo'lsa) */}
-                          {group.timeSlot && (
-                            <div className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                              <Clock size={14} className="text-blue-500" />
-                              <span className="font-medium">{group.timeSlot}</span>
+                      {/* Active Groups */}
+                      <div style={{
+                        background: card,
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: `1px solid ${bord}`,
+                      }} className="card-hover">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            background: 'rgba(34, 197, 94, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <Layers size={20} color="#22c55e" />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Faol guruhlar</p>
+                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>
+                              {groups.filter(g => g.status === 'active').length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pending Grading */}
+                      <div style={{
+                        background: card,
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: `1px solid ${bord}`,
+                      }} className="card-hover">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            background: 'rgba(245, 158, 11, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <CheckCircle size={20} color="#f59e0b" />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Baholash kutilmoqda</p>
+                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>
+                              {submissions.filter(s => !s.graded).length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ──────────── ASSIGNMENTS SECTION ──────────── */}
+                {activeSection === 'assignments' && (
+                  <div style={{ animation: 'fadeIn 0.3s ease-out' }} className="animate-fade">
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '20px',
+                    }}>
+                      <h2 style={{
+                        fontSize: '20px',
+                        fontWeight: 700,
+                        color: tx,
+                      }}>
+                        Mening Topshiriqlarim
+                      </h2>
+                      <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="btn-primary"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '12px 20px',
+                          borderRadius: '10px',
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          border: 'none',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Plus size={16} />
+                        Yaratish
+                      </button>
+                    </div>
+
+                    {assignments.length === 0 ? (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        background: card,
+                        borderRadius: '16px',
+                        border: `1px solid ${bord}`,
+                      }}>
+                        <FileText size={48} color={mu} style={{ marginBottom: '16px' }} />
+                        <p style={{ fontSize: '18px', fontWeight: 600, color: tx, marginBottom: '8px' }}>
+                          Hozircha topshiriqlar yo'q
+                        </p>
+                        <p style={{ fontSize: '14px', color: mu }}>
+                          Yangi topshiriq yaratish uchun "Yaratish" tugmasini bosing
+                        </p>
+                      </div>
+                    ) : (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                        gap: '16px',
+                      }}>
+                        {assignments.map((assignment) => (
+                          <div
+                            key={assignment.id}
+                            style={{
+                              background: bgItem,
+                              borderRadius: '16px',
+                              padding: '20px',
+                              border: `1px solid ${bord}`,
+                              cursor: 'pointer',
+                            }}
+                            className="card-hover"
+                            onClick={() => {
+                              setSelectedAssignment(assignment);
+                              loadSubmissions(assignment.id);
+                              setActiveSection('grading');
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                              <h3 style={{
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                color: tx,
+                                margin: 0,
+                              lineHeight: 1.3,
+                              overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {assignment.title}
+                              </h3>
                             </div>
-                          )}
-
-                          {/* Sana (agar mavjud bo'lsa) */}
-                          {group.startDate && (
-                            <div className={`flex items-center gap-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                              <Calendar size={14} className="text-purple-500" />
-                              <span className="font-medium">
-                                {new Date(group.startDate).toLocaleDateString('uz-UZ')}
-                                {group.endDate && ` - ${new Date(group.endDate).toLocaleDateString('uz-UZ')}`}
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteAssignment(assignment.id);
+                                }}
+                                style={{
+                                  padding: '6px',
+                                  borderRadius: '6px',
+                                  background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)',
+                                  border: 'none',
+                                  color: D ? '#fca5a5' : '#ef4444',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <Calendar size={14} color={mu} />
+                              <span style={{ fontSize: '12px', color: mu }}>
+                                {assignment.dueDate || 'Belgilanmagan'}
                               </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <BookOpen size={14} color={mu} />
+                              <span style={{ fontSize: '12px', color: mu }}>
+                                {assignment.points || 100} ball
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{
+                          height: '3px',
+                          background: '#e5e7eb',
+                          borderRadius: '4px',
+                          marginBottom: '12px',
+                        }} />
+                        <p style={{
+                          fontSize: '13px',
+                          color: mu,
+                          lineHeight: 1.5,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}>
+                          {assignment.description || 'Tavsif yo\'q'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+        {/* ──────────── GRADING SECTION ──────────── */}
+        {activeSection === 'grading' && selectedAssignment && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: sidebarOpen ? '280px' : '80px',
+            right: 0,
+            bottom: 0,
+            background: bg,
+            zIndex: 45,
+            overflowY: 'auto',
+            padding: '24px',
+          }} className="smooth-scroll">
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+              <button
+                onClick={() => setActiveSection('assignments')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: `1px solid ${bord}`,
+                  background: 'transparent',
+                  color: tx,
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  marginBottom: '20px',
+                }}
+              >
+                <span style={{ fontSize: '16px' }}>←</span>
+                Orqaga qaytish
+              </button>
+
+              <div style={{
+                background: card,
+                borderRadius: '16px',
+                padding: '24px',
+                border: `1px solid ${bord}`,
+                marginBottom: '20px',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                  <div>
+                    <h2 style={{
+                      fontSize: '20px',
+                      fontWeight: 700,
+                      color: tx,
+                      marginBottom: '8px',
+                    }}>
+                      {selectedAssignment.title}
+                    </h2>
+                    <p style={{ fontSize: '13px', color: mu }}>
+                      {selectedAssignment.description}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: '12px', color: mu, marginBottom: '4px' }}>
+                      Ball: {selectedAssignment.points || 100}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <Calendar size={14} color={mu} />
+                      <span style={{ fontSize: '12px', color: mu }}>
+                        {selectedAssignment.dueDate || 'Belgilanmagan'}
+                      </span>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+
+                <h3 style={{
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: tx,
+                  marginBottom: '16px',
+                }}>
+                  Topshiriq yuborilgan ({submissions.length})
+                </h3>
+
+                {submissions.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px',
+                    background: D ? 'rgba(255,255,255,0.03)' : '#f8fafc',
+                    borderRadius: '12px',
+                  }}>
+                    <CheckCircle size={32} color={mu} style={{ marginBottom: '12px' }} />
+                    <p style={{ fontSize: '14px', color: mu }}>
+                      Hali topshiriq yuborilmagan
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gap: '12px' }}>
+                    {submissions.map((submission) => (
+                      <div
+                        key={submission.id}
+                        style={{
+                          background: bgItem,
+                          borderRadius: '12px',
+                          padding: '16px',
+                          border: `1px solid ${bord}`,
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '10px',
+                              background: 'rgba(99, 102, 241, 0.1)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '20px',
+                              fontWeight: 700,
+                              color: BRAND,
+                            }}>
+                              {(submission.studentName || 'O\'quvchi')[0].toUpperCase()}
+                            </div>
+                            <p style={{ fontSize: '12px', fontWeight: 500, color: mu }}>
+                              {new Date(submission.submittedAt).toLocaleDateString('uz-UZ')}
+                            </p>
+                          </div>
+                          {submission.graded && (
+                            <div style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: submission.points >= 80 ? 'rgba(34,197,94,0.1)' : submission.points >= 60 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
+                              color: submission.points >= 80 ? '#22c55e' : submission.points >= 60 ? '#f59e0b' : '#ef4444',
+                            }}>
+                              {submission.points}
                             </div>
                           )}
                         </div>
-
-                        {/* Progress bar for students */}
-                        {maxStudents > 0 && (
-                          <div className="mt-3">
-                            <div className="flex justify-between mb-1 text-[10px]">
-                              <span className={isDarkMode ? 'text-gray-500' : 'text-gray-500'}>
-                                Joy egalligi
-                              </span>
-                              <span className={`font-bold ${
-                                isFull ? 'text-red-600' :
-                                spotsLeft < 5 ? 'text-amber-600' :
-                                'text-emerald-600'
-                              }`}>
-                                {Math.round((studentsCount / maxStudents) * 100)}%
-                              </span>
-                            </div>
-                            <div className="h-1.5 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  isFull ? 'bg-red-500' :
-                                  spotsLeft < 5 ? 'bg-amber-500' :
-                                  'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min((studentsCount / maxStudents) * 100, 100)}%` }}
-                              />
-                            </div>
+                        <p style={{
+                          fontSize: '13px',
+                          color: tx,
+                          lineHeight: 1.5,
+                          marginBottom: '12px',
+                          whiteSpace: 'pre-wrap',
+                        }}>
+                          {submission.content}
+                        </p>
+                        {!submission.graded && (
+                          <div style={{
+                            display: 'flex',
+                            gap: '8px',
+                            alignItems: 'center',
+                          }}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              placeholder="Ball (0-100)"
+                              style={{
+                                width: '100px',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                border: `1px solid ${bord}`,
+                                background: D ? '#2a2a35' : '#f8fafc',
+                                color: tx,
+                                outline: 'none',
+                              }}
+                              className="input-field"
+                            />
+                            <button
+                              onClick={() => {
+                                const input = document.getElementById(`grade-${submission.id}`);
+                                if (input.value) {
+                                  gradeSubmission(selectedAssignment.id, submission.id, input.value);
+                                }
+                              }}
+                              className="btn-primary"
+                              style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                color: 'white',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                border: 'none',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Baholash
+                            </button>
                           </div>
                         )}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-                  {groups.length === 0 && (
-                    <div className={`col-span-full text-center py-16 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <div className="w-20 h-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mx-auto mb-4">
-                        <Layers size={40} className="text-indigo-600 dark:text-indigo-400" />
+        {/* ──────────── GROUPS SECTION ──────────── */}
+        {activeSection === 'groups' && (
+          <div style={{ animation: 'fadeIn 0.3s ease-out' }} className="animate-fade">
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '20px',
+            }}>
+              <h2 style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: tx,
+              }}>
+                Mening Guruhlarim
+              </h2>
+              <p style={{ fontSize: '14px', color: mu }}>
+                {groups.length} ta guruh
+              </p>
+            </div>
+
+            {groups.length === 0 ? (
+              <div style={{
+                textAlign: 'center',
+                padding: '60px 20px',
+                background: card,
+                borderRadius: '16px',
+                border: `1px solid ${bord}`,
+              }}>
+                <Layers size={48} color={mu} style={{ marginBottom: '16px' }} />
+                <p style={{ fontSize: '18px', fontWeight: 600, color: tx, marginBottom: '8px' }}>
+                  Sizda hali guruhlar yo'q
+                </p>
+                <p style={{ fontSize: '14px', color: mu }}>
+                  Admin tomondan guruh yaratishingiz mumkin
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '16px',
+              }}>
+                {groups.map((group) => {
+                  const currentStudents = group.currentStudents || 0;
+                  const maxStudents = group.maxStudents || 20;
+                  const studentsCount = group.students?.length || currentStudents;
+                  const spotsLeft = maxStudents - studentsCount;
+                  const isFull = spotsLeft <= 0;
+                  const progress = maxStudents > 0 ? Math.round((studentsCount / maxStudents) * 100) : 0;
+
+                  return (
+                    <div
+                      key={group.id}
+                      style={{
+                        background: bgItem,
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: `1px solid ${bord}`,
+                        cursor: 'pointer',
+                      }}
+                      className="card-hover"
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        marginBottom: '12px',
+                      }}>
+                        <div style={{
+                          width: '50px',
+                          height: '50px',
+                          borderRadius: '12px',
+                          background: `linear-gradient(135deg, ${BRAND}, ${BRAND_LIGHT})`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontSize: '16px',
+                          fontWeight: 700,
+                        }}>
+                          {(group.name?.substring(0, 2)?.toUpperCase() || 'GR')}
+                        </div>
+                        <span style={{
+                          padding: '6px 12px',
+                          borderRadius: '20px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          background: group.status === 'active' ? '#22c55e' : '#ef4444',
+                          color: 'white',
+                        }}>
+                          {group.status === 'active' ? 'FAOL' : 'NOFAOL'}
+                        </span>
                       </div>
-                      <p className="text-lg font-semibold mb-2">Sizda guruhlar yo'q</p>
-                      <p className="text-sm">Admin tomonidan guruh tayinlashishi mumkin</p>
+                      <h3 style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        color: tx,
+                        margin: 0,
+                      }}>
+                        {group.name}
+                      </h3>
                     </div>
-                  )}
-                </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <BookOpen size={16} color={mu} />
+                        <span style={{ fontSize: '13px', color: mu }}>
+                          {group.courseTitle || group.course?.title || 'Kurs'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Users size={16} color={mu} />
+                      <span style={{ fontSize: '13px', color: mu }}>
+                        {studentsCount}/{maxStudents} o'quvchi
+                        {isFull && (
+                          <span style={{
+                            marginLeft: '8px',
+                            padding: '4px 8px',
+                            borderRadius: '12px',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            background: 'rgba(239,68,68,0.1)',
+                            color: '#ef4444',
+                          }}>
+                            TO'LIQ
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    </div>
+
+                    {group.timeSlot && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <Clock size={16} color={mu} />
+                        <span style={{ fontSize: '13px', color: mu }}>
+                          {group.timeSlot}
+                        </span>
+                      </div>
+                    )}
+
+                    {group.startDate && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        marginBottom: '12px',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        background: D ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)',
+                        border: `1px solid rgba(99, 102, 241, 0.1)`,
+                      }}>
+                        <Calendar size={14} color={BRAND} />
+                        <span style={{ fontSize: '12px', color: mu }}>
+                          {new Date(group.startDate).toLocaleDateString('uz-UZ')}
+                          {group.endDate && ` - ${new Date(group.endDate).toLocaleDateString('uz-UZ')}`}
+                        </span>
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '12px' }}>
+                      <p style={{ fontSize: '12px', fontWeight: 600, color: mu, marginBottom: '6px' }}>
+                        Joy egalligi
+                      </p>
+                      <div className="progress-bar" style={{ height: '8px' }}>
+                        <div
+                          className="progress-fill"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div style={{
+                        marginTop: '6px',
+                        fontSize: '12px',
+                        color: mu,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                      }}>
+                        <span>{progress}%</span>
+                        <span style={{
+                          color: isFull ? '#ef4444' : progress >= 80 ? '#22c55e' : progress >= 60 ? '#f59e0b' : '#22c55e',
+                          fontWeight: 700,
+                        }}>
+                          {isFull ? 'To\'liq' : spotsLeft < 5 ? 'Ostona' : spotsLeft < 10 ? 'Kam joy' : 'Ko\'p joy bor'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
-      </div>
 
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden border ${
-            isDarkMode ? 'border-white/10' : 'border-gray-200'
-          }`}>
-            <div className="px-6 py-4 border-b dark:border-gray-700 flex items-center justify-between">
-              <h3 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                Yangi Topshiriq Yaratish
-              </h3>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div>
-                <label className={`block text-sm font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Topshiriq nomi
-                </label>
-                <input
-                  required
-                  placeholder="Topshiriq nomini kiriting..."
-                  className={`w-full p-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
-                    isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                  }`}
-                  value={form.title}
-                  onChange={e => setForm({...form, title: e.target.value})}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-sm font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Topshiriq tavsifi
-                </label>
-                <textarea
-                  required
-                  placeholder="Topshiriq tavsifini kiriting..."
-                  className={`w-full p-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 h-36 resize-none transition-all ${
-                    isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                  }`}
-                  value={form.description}
-                  onChange={e => setForm({...form, description: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* ──────────── CREATE MODAL ──────────────────── */}
+        {showCreateModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}>
+            <div style={{
+              background: card,
+              borderRadius: '16px',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+              animation: 'fadeIn 0.2s ease-out',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+                borderBottom: `1px solid ${bord}`,
+                paddingBottom: '16px',
+              }}>
                 <div>
-                  <label className={`block text-sm font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Guruh
+                  <h3 style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: tx,
+                    marginBottom: '4px',
+                  }}>
+                    Yangi Topshiriq Yaratish
+                  </h3>
+                  <p style={{ fontSize: '13px', color: mu }}>
+                    O'quvchilarga topshiriq berish
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  style={{
+                    padding: '8px',
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: mu,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: tx,
+                    marginBottom: '8px',
+                  }}>
+                    Topshiriq nomi
                   </label>
-                  <div className="relative">
-                    <Layers size={16} className={`absolute left-4 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-400'}`} />
+                  <input
+                    required
+                    placeholder="Topshiriq nomini kiriting..."
+                    className="input-field"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                    }}
+                    value={form.title}
+                    onChange={e => setForm({...form, title: e.target.value})}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: tx,
+                    marginBottom: '8px',
+                  }}>
+                    Tavsif
+                  </label>
+                  <textarea
+                    required
+                    placeholder="Topshiriq tavsifini kiriting..."
+                    className="input-field"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      minHeight: '80px',
+                      resize: 'vertical',
+                    }}
+                    value={form.description}
+                    onChange={e => setForm({...form, description: e.target.value})}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: tx,
+                      marginBottom: '8px',
+                    }}>
+                      Guruh
+                    </label>
                     <select
                       required
-                      className={`w-full pl-12 pr-4 py-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 appearance-none cursor-pointer transition-all ${
-                        isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                      }`}
+                      className="input-field"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                      }}
                       value={form.groupId}
                       onChange={e => setForm({...form, groupId: e.target.value})}
                     >
@@ -607,65 +1547,94 @@ export default function TeacherPanel() {
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: tx,
+                      marginBottom: '8px',
+                    }}>
+                      Muddat
+                    </label>
+                    <input
+                      required
+                      type="date"
+                      className="input-field"
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                      }}
+                      value={form.dueDate}
+                      onChange={e => setForm({...form, dueDate: e.target.value})}
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Muddat
+                  <label style={{
+                    display: 'block',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: tx,
+                    marginBottom: '8px',
+                  }}>
+                    Ball (0-100)
                   </label>
                   <input
                     required
-                    type="date"
-                    className={`w-full p-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
-                      isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                    }`}
-                    value={form.dueDate}
-                    onChange={e => setForm({...form, dueDate: e.target.value})}
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="Maksimum ball"
+                    className="input-field"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                    }}
+                    value={form.points}
+                    onChange={e => setForm({...form, points: parseInt(e.target.value)})}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className={`block text-sm font-bold mb-2 uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Ball (0-100)
-                </label>
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  max="100"
-                  placeholder="Maksimum ball"
-                  className={`w-full p-4 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${
-                    isDarkMode ? 'bg-gray-700 text-white border border-white/10' : 'bg-gray-50 text-gray-900 border border-gray-200'
-                  }`}
-                  value={form.points}
-                  onChange={e => setForm({...form, points: parseInt(e.target.value)})}
-                />
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className={`flex-1 py-4 font-bold rounded-xl transition-all ${
-                    isDarkMode
-                      ? 'bg-white/10 hover:bg-white/20 text-gray-300'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  Bekor qilish
-                </button>
-                <button
-                  disabled={modalLoading}
-                  className="flex-1 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {modalLoading ? "Saqlanmoqda..." : "Saqlash"}
-                </button>
-              </div>
-            </form>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateModal(false)}
+                    className="btn-secondary"
+                    style={{
+                      flex: 1,
+                      padding: '12px 20px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Bekor qilish
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={modalLoading}
+                    className="btn-primary"
+                    style={{
+                      flex: 2,
+                      padding: '12px 20px',
+                      borderRadius: '8px',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                    }}
+                  >
+                    {modalLoading ? 'Saqlanmoqda...' : 'Yaratish'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

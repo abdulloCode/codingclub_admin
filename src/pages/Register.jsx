@@ -20,10 +20,29 @@ export default function Register() {
   const [focused, setFocused] = useState('');
   const { register, user } = useAuth();
 
+  // Ro'yxatdan o'tgandan keyin role bo'yicha avtomatik redirect
   useEffect(() => {
-    if (user) {
-      // Ro'yxatdan o'tgandan so'ng login sahifasiga o'tish
-      navigate('/login');
+    if (user && user.role) {
+      console.log("User registered with role:", user.role);
+
+      // Role bo'yicha to'g'ri panelga yuborish
+      switch (user.role) {
+        case 'admin':
+          console.log("Redirecting to admin panel");
+          navigate('/admin-panel', { replace: true });
+          break;
+        case 'teacher':
+          console.log("Redirecting to teacher panel");
+          navigate('/teacher-panel', { replace: true });
+          break;
+        case 'student':
+          console.log("Redirecting to student panel");
+          navigate('/students-panel', { replace: true });
+          break;
+        default:
+          console.error("Unknown role:", user.role);
+          break;
+      }
     }
   }, [user, navigate]);
 
@@ -70,8 +89,7 @@ export default function Register() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
-        .reg-root * { font-family: 'Geist', 'SF Pro Display', system-ui, sans-serif; }
+        .reg-root {}
 
         .grid-bg {
           background-image:
@@ -226,7 +244,7 @@ export default function Register() {
             </h2>
 
             <p className={`lp-3 text-sm leading-relaxed mb-10 max-w-[280px] ${isDarkMode ? 'text-white/40' : 'text-gray-400'}`}>
-              Admin akkaunt yarating va o'quv markazingizni to'liq boshqarishga kiring.
+              Ro'yxatdan o'ting - avtomatik role bo'yicha panelga yuboriladi.
             </p>
 
             <div className="lp-4">
@@ -291,11 +309,11 @@ export default function Register() {
                   </h1>
                   {/* Step indicator */}
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-500'}`}>
-                    Admin hisob
+                    Ro'yxat
                   </span>
                 </div>
                 <p className={`text-sm ${isDarkMode ? 'text-white/35' : 'text-gray-400'}`}>
-                  Markazingizni boshqarish uchun akkaunt yarating
+                  Ro'yxatdan o'tish - avtomatik role bo'yicha panelga yuboriladi
                 </p>
               </div>
 

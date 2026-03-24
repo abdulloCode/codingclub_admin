@@ -9,12 +9,22 @@ export default function TeacherLogin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
+  const { teacherLogin, user, isLoading: authLoading } = useAuth();
+
   const [formData, setFormData] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState("");
-  const { login, user } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'teacher') navigate('/teacher-panel', { replace: true });
+      else if (user.role === 'admin') navigate('/admin-panel', { replace: true });
+      else if (user.role === 'student') navigate('/students-panel', { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (location.state?.phone && location.state?.password) {
@@ -22,330 +32,227 @@ export default function TeacherLogin() {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    if (user) {
-      if (user.role === "teacher") navigate("/teachers");
-      else navigate("/admin-panel");
-    }
-  }, [user, navigate]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
     try {
-      console.log("Teacher login form data:", formData);
-      const response = await login(formData.phone, formData.password);
-      console.log("Teacher login response:", response);
+      await teacherLogin(formData.phone, formData.password);
+      // useEffect yuqorida redirect qiladi
     } catch (err) {
-      console.error("Teacher login error:", err);
-      setError(err instanceof Error ? err.message : "Kirishda xatolik yuz berdi");
+      setError(err.message || "Kirishda xatolik yuz berdi");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const inputWrapClass = (name) => {
+  const G = "#10b981";
+
+  const inputWrapStyle = (name) => {
     const isFoc = focused === name;
-    const base = `input-wrap flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all duration-200 ${isFoc ? "is-focused" : ""}`;
-    const style = isFoc
-      ? isDarkMode
-        ? "bg-white/[0.07] border-emerald-500/70 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]"
-        : "bg-white border-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]"
-      : isDarkMode
-        ? "bg-white/[0.03] border-white/[0.08] hover:border-emerald-500/40 hover:bg-white/[0.05]"
-        : "bg-gray-50/80 border-gray-200 hover:border-emerald-500/40 hover:bg-white";
-    return `${base} ${style}`;
+    return {
+      display:"flex", alignItems:"center", gap:12,
+      padding:"11px 14px", borderRadius:12,
+      background: isFoc
+        ? isDarkMode ? "rgba(255,255,255,0.07)" : "#fff"
+        : isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(16,185,129,0.03)",
+      border: `1px solid ${isFoc ? G : isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(16,185,129,0.15)"}`,
+      boxShadow: isFoc ? "0 0 0 3px rgba(16,185,129,0.14)" : "none",
+      transition: "all .2s",
+    };
   };
 
   const stats = [
-    { Icon: Users,      value: "150+",   label: "O'qituvchilar" },
-    { Icon: BookOpen,   value: "48",     label: "Guruhlar"    },
-    { Icon: TrendingUp, value: "95%",    label: "Davomat"     },
+    { Icon: Users,      value: "150+", label: "O'qituvchilar" },
+    { Icon: BookOpen,   value: "48",   label: "Guruhlar"      },
+    { Icon: TrendingUp, value: "95%",  label: "Davomat"       },
   ];
-
   const features = [
-    { Icon: Users,      title: "O'quvchilar boshqaruvi", desc: "Ro'yxat, davomat va baholash"       },
-    { Icon: BookOpen,   title: "Guruh va jadvallar",      desc: "Dars jadvali va guruh tarkibi"    },
-    { Icon: TrendingUp, title: "Hisobot va statistika",   desc: "Davomat va baholar hisobotlari"    },
-    { Icon: Shield,     title: "Xavfsiz tizim",           desc: "Ma'lumotlaringiz himoyalangan"          },
+    { Icon: Users,      title: "O'quvchilar boshqaruvi", desc: "Ro'yxat, davomat va baholash"    },
+    { Icon: BookOpen,   title: "Guruh va jadvallar",      desc: "Dars jadvali va guruh tarkibi"  },
+    { Icon: TrendingUp, title: "Hisobot va statistika",   desc: "Davomat va baholar hisobotlari" },
+    { Icon: Shield,     title: "Xavfsiz tizim",           desc: "Ma'lumotlaringiz himoyalangan"  },
   ];
 
-  const G = "#10b981";
-  const GL = "#34d399";
+  const tx = isDarkMode ? "#f5f5f7" : "#111";
+  const mu = isDarkMode ? "rgba(255,255,255,0.35)" : "#9ca3af";
+  const bord = isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(16,185,129,0.12)";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
-        .login-root * { font-family:'Geist',system-ui,sans-serif; }
-
-        .grid-bg      { background-image:linear-gradient(rgba(16,185,129,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.05) 1px,transparent 1px); background-size:44px 44px; }
-        .grid-bg-dark { background-image:linear-gradient(rgba(16,185,129,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.08) 1px,transparent 1px); background-size:44px 44px; }
-        .glow-orb { position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none; }
-        .noise-overlay { background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"); opacity:0.02;pointer-events:none; }
-
-        .input-field { transition:all 0.18s ease;letter-spacing:0.01em; }
-        .input-field:focus { outline:none; }
-        .input-wrap { position:relative;transition:all 0.22s cubic-bezier(0.4,0,0.2,1); }
-        .input-wrap::after { content:'';position:absolute;inset:-1px;border-radius:13px;opacity:0;transition:opacity 0.25s;pointer-events:none;background:linear-gradient(135deg,rgba(16,185,129,0.5),rgba(52,211,153,0.28));z-index:-1;filter:blur(9px); }
-        .input-wrap.is-focused::after { opacity:1; }
-        .input-wrap:hover,.input-wrap.is-focused { transform:translateY(-1px); }
-
-        .btn-submit { position:relative;overflow:hidden;transition:all 0.22s cubic-bezier(0.4,0,0.2,1);letter-spacing:0.03em; }
-        .btn-submit::before { content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 55%);opacity:0;transition:opacity 0.22s; }
-        .btn-glow { position:absolute;inset:-4px;border-radius:16px;background:linear-gradient(135deg,#10b981,#34d399,#059669);opacity:0;z-index:-1;filter:blur(14px);transition:opacity 0.3s; }
-        .btn-submit:hover .btn-glow { opacity:0.8; }
-        .btn-submit:hover::before { opacity:1; }
-        .btn-submit:hover { transform:translateY(-2px);box-shadow:0 14px 44px rgba(16,185,129,0.5) !important; }
-        .btn-submit:active { transform:scale(0.973) translateY(0); }
-        .btn-submit .arrow-icon { transition:transform 0.2s; }
-        .btn-submit:hover .arrow-icon { transform:translateX(5px); }
-
-        .login-card { position:relative;transition:box-shadow 0.35s,transform 0.35s; }
-        .login-card::before { content:'';position:absolute;inset:0;border-radius:17px;background:linear-gradient(135deg,rgba(16,185,129,0.2) 0%,rgba(52,211,153,0.07) 50%,transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;pointer-events:none;opacity:0;transition:opacity 0.4s; }
-        .login-card:hover::before { opacity:1; }
-        .login-card:hover { transform:translateY(-3px); }
-
-        .stat-card { border-radius:14px;padding:16px;transition:transform 0.2s,box-shadow 0.2s; }
-        .stat-card:hover { transform:translateY(-2px); }
-
-        .feat-icon { width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
-        .feat-row { display:flex;align-items:flex-start;gap:13px;padding:13px 0; }
-        .feat-row+.feat-row { border-top:1px solid; }
-
-        .card-enter { animation:cardEnter 0.65s cubic-bezier(0.16,1,0.3,1) forwards; }
-        @keyframes cardEnter { from{opacity:0;transform:translateY(30px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
-        .lp-1{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.08s both}
-        .lp-2{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.18s both}
-        .lp-3{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.28s both}
-        .lp-4{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.38s both}
-        .lp-5{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.48s both}
-        .logo-enter{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s both}
-        .h-enter{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.12s both}
-        .f1{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.20s both}
-        .f2{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.28s both}
-        .fb{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.40s both}
-        .ff{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.46s both}
-        @keyframes fu { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-
-        .field-label { font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase; }
-        .div-line { flex:1;height:1px; }
+        @keyframes fu{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes cardEnter{from{opacity:0;transform:translateY(30px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes tl-spin{to{transform:rotate(360deg)}}
+        .tl-lp1{animation:fu .5s ease .08s both}.tl-lp2{animation:fu .5s ease .18s both}
+        .tl-lp3{animation:fu .5s ease .28s both}.tl-lp4{animation:fu .5s ease .38s both}
+        .tl-lp5{animation:fu .5s ease .48s both}
+        .tl-card{animation:cardEnter .65s cubic-bezier(.16,1,.3,1) both}
+        .tl-f1{animation:fu .4s ease .20s both}.tl-f2{animation:fu .4s ease .28s both}
+        .tl-fb{animation:fu .4s ease .40s both}.tl-ff{animation:fu .4s ease .46s both}
+        .tl-inp:hover{transform:translateY(-1px)}
+        .tl-btn{position:relative;overflow:hidden;transition:transform .22s,box-shadow .22s}
+        .tl-btn:hover{transform:translateY(-2px);box-shadow:0 14px 44px rgba(16,185,129,0.5)!important}
+        .tl-btn:active{transform:scale(0.973)}
+        .tl-arrow{transition:transform .2s}.tl-btn:hover .tl-arrow{transform:translateX(5px)}
+        .tl-stat{border-radius:14px;padding:16px;transition:transform .2s}.tl-stat:hover{transform:translateY(-2px)}
+        .tl-feat{display:flex;align-items:flex-start;gap:13px;padding:13px 0}
+        .tl-feat+.tl-feat{border-top:1px solid}
+        .tl-feat-icon{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+        .tl-mobile-logo{display:flex}@media(min-width:1024px){.tl-mobile-logo{display:none!important}}
+        .tl-left{display:none}@media(min-width:1024px){.tl-left{display:flex!important}}
       `}</style>
 
-      <div className={`login-root min-h-screen relative overflow-hidden flex ${isDarkMode ? "bg-[#070d07]" : "bg-[#f3f7f3]"}`}>
-        <div className="absolute inset-0 noise-overlay z-0" />
-        <div className={`absolute inset-0 z-0 ${isDarkMode ? "grid-bg-dark" : "grid-bg"}`} />
-        <div className="glow-orb z-0" style={{ width:700,height:700,top:-180,left:-180, background:isDarkMode?"radial-gradient(circle,rgba(16,185,129,0.22) 0%,transparent 70%)":"radial-gradient(circle,rgba(16,185,129,0.11) 0%,transparent 70%)" }} />
-        <div className="glow-orb z-0" style={{ width:500,height:500,bottom:-120,right:-80, background:isDarkMode?"radial-gradient(circle,rgba(16,185,129,0.14) 0%,transparent 70%)":"radial-gradient(circle,rgba(16,185,129,0.07) 0%,transparent 70%)" }} />
-
-        {/* ══ LEFT PANEL ══ */}
-        <div className={`hidden lg:flex flex-col justify-between w-[48%] p-12 relative z-10 border-r overflow-y-auto ${isDarkMode ? "border-white/[0.05]" : "border-emerald-500/10"}`}>
-
-          {/* Logo */}
-          <div className="lp-1 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${isDarkMode ? "bg-emerald-500/20" : "bg-white shadow-emerald-500/15"}`}>
-              <img src={icon} alt="logo" className="w-6 h-6 object-contain" />
+      <div style={{ minHeight:"100vh", position:"relative", overflow:"hidden", display:"flex", background: isDarkMode?"#070d07":"#f3f7f3" }}>
+        {/* LEFT PANEL */}
+        <div style={{ flexDirection:"column", justifyContent:"space-between", width:"48%", padding:"48px 52px", position:"relative", zIndex:10, borderRight:`1px solid ${bord}`, overflowY:"auto" }} className="tl-left">
+          <div className="tl-lp1" style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:40, height:40, borderRadius:13, background:"rgba(16,185,129,0.15)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <GraduationCap size={20} color={G} />
             </div>
             <div>
-              <p className={`text-sm font-bold leading-none ${isDarkMode ? "text-white" : "text-gray-900"}`}>Codingclub</p>
-              <p style={{ fontSize:10, marginTop:2, color: isDarkMode?"rgba(255,255,255,0.3)":"rgba(16,185,129,0.6)" }}>O'quv Markazi</p>
+              <p style={{ fontSize:16, fontWeight:700, color:tx, lineHeight:1 }}>Codingclub</p>
+              <p style={{ fontSize:10, marginTop:2, color:mu }}>O'quv Markazi</p>
             </div>
           </div>
 
-          {/* Center */}
-          <div className="my-8">
-            {/* Badge */}
-            <div className="lp-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-8"
-              style={{ background:isDarkMode?"rgba(16,185,129,0.12)":"rgba(16,185,129,0.08)", border:`1px solid ${isDarkMode?"rgba(16,185,129,0.28)":"rgba(16,185,129,0.18)"}`, color:G }}>
-              <span style={{ width:6,height:6,borderRadius:"50%",background:G,display:"inline-block" }} className="animate-pulse" />
-              O'qituvchi kirish — v2.0
+          <div style={{ margin:"40px 0" }}>
+            <div className="tl-lp2" style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"6px 12px", borderRadius:99, marginBottom:28, background: isDarkMode?"rgba(16,185,129,0.12)":"rgba(16,185,129,0.08)", border:`1px solid ${isDarkMode?"rgba(16,185,129,0.28)":"rgba(16,185,129,0.18)"}` }}>
+              <span style={{ width:6, height:6, borderRadius:"50%", background:G, display:"inline-block" }} className="tl-pulse"/>
+              <span style={{ fontSize:11, fontWeight:700, color:G }}>O'qituvchi kirish</span>
             </div>
-
-            {/* Heading */}
-            <h2 className={`lp-3 font-extrabold leading-[1.12] tracking-tight mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`}
-              style={{ fontSize: 34 }}>
-              O'qituvchilar<br />
-              <span style={{ color: G }}>Boshqaruv Paneli</span><br />
-              <span style={{ fontWeight:300, fontSize:26, color:isDarkMode?"rgba(255,255,255,0.28)":"#c0c0c0" }}>Guruhlarni boshqarish</span>
+            <h2 className="tl-lp3" style={{ fontSize:34, fontWeight:800, lineHeight:1.12, letterSpacing:"-0.02em", marginBottom:14, color:tx }}>
+              O'qituvchilar<br/>
+              <span style={{ color:G }}>Boshqaruv Paneli</span><br/>
+              <span style={{ fontWeight:300, fontSize:26, color: isDarkMode?"rgba(255,255,255,0.28)":"#c0c0c0" }}>Guruhlarni boshqarish</span>
             </h2>
-
-            <p className="lp-3 text-sm leading-relaxed mb-8 max-w-[290px]"
-              style={{ color:isDarkMode?"rgba(255,255,255,0.38)":"#9ca3af" }}>
+            <p className="tl-lp3" style={{ fontSize:13.5, lineHeight:1.7, marginBottom:32, maxWidth:290, color:mu }}>
               Guruhlaringizni, dars jadvalingizni va o'quvchilaringizni bitta qulay tizimdan boshqaring.
             </p>
-
-            {/* Stats */}
-            <div className="lp-4 grid grid-cols-3 gap-3 mb-8">
+            <div className="tl-lp4" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10, marginBottom:32 }}>
               {stats.map(({ Icon, value, label }) => (
-                <div key={label} className="stat-card"
-                  style={{ background:isDarkMode?"rgba(16,185,129,0.09)":"rgba(16,185,129,0.06)", border:`1px solid ${isDarkMode?"rgba(16,185,129,0.16)":"rgba(16,185,129,0.12)"}` }}>
-                  <Icon size={15} color={G} style={{ marginBottom:8 }} />
-                  <p className={`text-xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-gray-900"}`}>{value}</p>
-                  <p style={{ fontSize:11, marginTop:2, color:isDarkMode?"rgba(255,255,255,0.28)":"#9ca3af" }}>{label}</p>
+                <div key={label} className="tl-stat" style={{ background: isDarkMode?"rgba(16,185,129,0.09)":"rgba(16,185,129,0.06)", border:`1px solid ${isDarkMode?"rgba(16,185,129,0.16)":"rgba(16,185,129,0.12)"}` }}>
+                  <Icon size={15} color={G} style={{ marginBottom:8 }}/>
+                  <p style={{ fontSize:20, fontWeight:800, color:tx }}>{value}</p>
+                  <p style={{ fontSize:11, marginTop:2, color:mu }}>{label}</p>
                 </div>
               ))}
             </div>
-
-            {/* Features */}
-            <div className="lp-5">
+            <div className="tl-lp5">
               {features.map(({ Icon, title, desc }, i) => (
-                <div key={i} className="feat-row" style={{ borderColor:isDarkMode?"rgba(255,255,255,0.05)":"rgba(16,185,129,0.08)" }}>
-                  <div className="feat-icon" style={{ background:isDarkMode?"rgba(16,185,129,0.12)":"rgba(16,185,129,0.08)" }}>
-                    <Icon size={15} color={G} />
+                <div key={i} className="tl-feat" style={{ borderColor: isDarkMode?"rgba(255,255,255,0.05)":"rgba(16,185,129,0.08)" }}>
+                  <div className="tl-feat-icon" style={{ background: isDarkMode?"rgba(16,185,129,0.12)":"rgba(16,185,129,0.08)" }}>
+                    <Icon size={15} color={G}/>
                   </div>
                   <div>
-                    <p className={`text-sm font-semibold ${isDarkMode ? "text-white/85" : "text-gray-800"}`}>{title}</p>
-                    <p style={{ fontSize:12, marginTop:2, color:isDarkMode?"rgba(255,255,255,0.3)":"#9ca3af", lineHeight:1.5 }}>{desc}</p>
+                    <p style={{ fontSize:13, fontWeight:600, color:tx }}>{title}</p>
+                    <p style={{ fontSize:12, marginTop:2, color:mu, lineHeight:1.5 }}>{desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Footer */}
-          <div className="lp-5 flex items-center gap-2" style={{ color:isDarkMode?"rgba(255,255,255,0.15)":"#d1d5db", fontSize:12 }}>
-            <span style={{ width:6,height:6,borderRadius:"50%",background:G,opacity:0.5,display:"inline-block" }} />
-            © 2024 Codingclub. Barcha huquqlar himoyalangan.
-          </div>
+          <p style={{ fontSize:12, color: isDarkMode?"rgba(255,255,255,0.15)":"#d1d5db" }}>© {new Date().getFullYear()} Codingclub. Barcha huquqlar himoyalangan.</p>
         </div>
 
-        {/* ══ RIGHT PANEL ══ */}
-        <div className="flex-1 flex items-center justify-center p-6 relative z-10">
-          <div className="w-full max-w-[400px]">
-
+        {/* RIGHT PANEL */}
+        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:24, position:"relative", zIndex:10 }}>
+          <div style={{ width:"100%", maxWidth:400 }}>
             {/* Mobile logo */}
-            <div className="lg:hidden flex items-center gap-2.5 mb-10 logo-enter">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-emerald-500/20" : "bg-white shadow-sm"}`}>
-                <img src={icon} alt="logo" className="w-5 h-5 object-contain" />
+            <div className="tl-lp1 tl-mobile-logo" style={{ alignItems:"center", gap:10, marginBottom:32 }}>
+              <div style={{ width:36, height:36, borderRadius:11, background:"rgba(16,185,129,0.15)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                <GraduationCap size={18} color={G}/>
               </div>
               <div>
-                <p className={`text-sm font-bold leading-none ${isDarkMode ? "text-white" : "text-gray-900"}`}>Codingclub</p>
-                <p style={{ fontSize:10, marginTop:2, color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(16,185,129,0.6)" }}>O'quv Markazi Boshqaruv Tizimi</p>
+                <p style={{ fontSize:15, fontWeight:700, color:tx, lineHeight:1 }}>Codingclub</p>
+                <p style={{ fontSize:10, marginTop:1, color:mu }}>O'quv Markazi Boshqaruv Tizimi</p>
               </div>
             </div>
-            <div className={`login-card card-enter rounded-2xl p-8 border ${
-              isDarkMode
-                ? "bg-white/[0.03] border-white/[0.06] shadow-[0_24px_80px_rgba(0,0,0,0.7)]"
-                : "bg-white shadow-[0_8px_48px_rgba(16,185,129,0.10),inset_0_1px_0_rgba(255,255,255,1)]"
-            }`}
-              style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(16,185,129,0.12)" }}>
 
-
-              <div className="h-enter mb-7">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background:"rgba(16,185,129,0.1)" }}>
-                    <GraduationCap size={14} className="text-emerald-500" />
+            <div className="tl-card" style={{ borderRadius:22, padding:"32px 32px 28px", background: isDarkMode?"rgba(255,255,255,0.03)":"#ffffff", border:`1px solid ${bord}`, boxShadow: isDarkMode?"0 24px 80px rgba(0,0,0,0.70)":"0 8px 48px rgba(16,185,129,0.10),inset 0 1px 0 rgba(255,255,255,1)" }}>
+              <div className="tl-lp1" style={{ marginBottom:28 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                  <div style={{ width:28, height:28, borderRadius:9, background:"rgba(16,185,129,0.10)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <GraduationCap size={14} color={G}/>
                   </div>
-                  <span style={{ fontSize:12, fontWeight:600, color:isDarkMode?"rgba(255,255,255,0.35)":"rgba(16,185,129,0.65)" }}>
-                    O'qituvchi Portal
-                  </span>
+                  <span style={{ fontSize:11, fontWeight:700, color:mu }}>O'QITUVCHI PORTAL</span>
                 </div>
-                <h1 className={`text-xl font-bold tracking-tight mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  Tizimga kirish
-                </h1>
-                <p style={{ fontSize:13.5, color:isDarkMode?"rgba(255,255,255,0.35)":"#9ca3af" }}>
-                  O'qituvchi boshqaruv paneliga xush kelibsiz
-                </p>
+                <h1 style={{ fontSize:22, fontWeight:800, letterSpacing:"-0.02em", color:tx, marginBottom:5 }}>Tizimga kirish</h1>
+                <p style={{ fontSize:13, color:mu, lineHeight:1.6 }}>O'qituvchi boshqaruv paneliga xush kelibsiz</p>
               </div>
 
-              {/* Error */}
               {error && (
-                <div className={`mb-5 flex items-start gap-3 p-3.5 rounded-xl text-sm border ${
-                  isDarkMode ? "bg-red-500/8 border-red-500/20 text-red-400" : "bg-red-50 border-red-100 text-red-600"
-                }`}>
-                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"12px 14px", borderRadius:12, marginBottom:20, background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.22)" }}>
+                  <AlertCircle size={14} color="#ef4444" style={{ flexShrink:0, marginTop:1 }}/>
+                  <span style={{ fontSize:13, color:"#ef4444", lineHeight:1.5 }}>{error}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-
-                {/* Phone */}
-                <div className="f1">
-                  <label className="field-label block mb-2" style={{ color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(16,185,129,0.55)" }}>
-                    Telefon raqami
-                  </label>
-                  <div className={inputWrapClass("phone")}>
-                    <Phone size={15} style={{ flexShrink:0, color: focused==="phone" ? G : isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db", transition:"color 0.15s" }} />
-                    <input type="tel" required
-                      value={formData.phone}
-                      onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                      onFocus={() => setFocused("phone")}
-                      onBlur={() => setFocused("")}
-                      placeholder="+998 90 123 45 67"
-                      autoComplete="tel"
-                      className={`input-field flex-1 bg-transparent text-sm ${isDarkMode ? "text-white placeholder-white/20" : "text-gray-900 placeholder-gray-300"}`}
+              <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div className="tl-f1">
+                  <label style={{ display:"block", fontSize:10, fontWeight:800, color:mu, textTransform:"uppercase", letterSpacing:"0.07em", marginBottom:7 }}>Telefon yoki Email</label>
+                  <div className="tl-inp" style={{ ...inputWrapStyle("phone"), transition:"all .2s" }}>
+                    <Phone size={15} color={focused==="phone"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
+                    <input type="text" required value={formData.phone}
+                      onChange={e => setFormData({...formData, phone:e.target.value})}
+                      onFocus={() => setFocused("phone")} onBlur={() => setFocused("")}
+                      placeholder="+998 90 123 45 67 yoki email" autoComplete="username"
+                      style={{ flex:1, background:"transparent", border:"none", outline:"none", fontSize:13, color:tx }}
                     />
                   </div>
                 </div>
 
-                {/* Password */}
-                <div className="f2">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="field-label" style={{ color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(16,185,129,0.55)" }}>Parol</label>
+                <div className="tl-f2">
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:7 }}>
+                    <label style={{ fontSize:10, fontWeight:800, color:mu, textTransform:"uppercase", letterSpacing:"0.07em" }}>Parol</label>
                     <a href="#" style={{ fontSize:12, fontWeight:600, color:G, textDecoration:"none" }}>Unutdingizmi?</a>
                   </div>
-                  <div className={inputWrapClass("password")}>
-                    <Lock size={15} style={{ flexShrink:0, color: focused==="password" ? G : isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db", transition:"color 0.15s" }} />
-                    <input type={showPassword ? "text" : "password"} required
-                      value={formData.password}
-                      onChange={e => setFormData({ ...formData, password: e.target.value })}
-                      onFocus={() => setFocused("password")}
-                      onBlur={() => setFocused("")}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      className={`input-field flex-1 bg-transparent text-sm ${isDarkMode ? "text-white placeholder-white/20" : "text-gray-900 placeholder-gray-300"}`}
+                  <div className="tl-inp" style={{ ...inputWrapStyle("password"), transition:"all .2s" }}>
+                    <Lock size={15} color={focused==="password"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
+                    <input type={showPassword?"text":"password"} required value={formData.password}
+                      onChange={e => setFormData({...formData, password:e.target.value})}
+                      onFocus={() => setFocused("password")} onBlur={() => setFocused("")}
+                      placeholder="••••••••" autoComplete="current-password"
+                      style={{ flex:1, background:"transparent", border:"none", outline:"none", fontSize:13, color:tx }}
                     />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      style={{ flexShrink:0, color:isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db", background:"none", border:"none", cursor:"pointer", transition:"color 0.15s" }}
+                      style={{ background:"none", border:"none", cursor:"pointer", color:mu, flexShrink:0, padding:0, transition:"color .15s" }}
                       onMouseOver={e => e.currentTarget.style.color=G}
-                      onMouseOut={e => e.currentTarget.style.color=isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db"}>
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      onMouseOut={e => e.currentTarget.style.color=mu}>
+                      {showPassword ? <EyeOff size={15}/> : <Eye size={15}/>}
                     </button>
                   </div>
                 </div>
-                <div className="f3 flex items-center gap-2.5 pt-0.5">
-                  <input type="checkbox" id="remember" style={{ accentColor:G, width:16, height:16, cursor:"pointer" }} />
-                  <label htmlFor="remember" className={`text-sm cursor-pointer select-none ${isDarkMode ? "text-white/40" : "text-gray-400"}`}>
-                    Eslab qolish
-                  </label>
+
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <input type="checkbox" id="remember-t" style={{ accentColor:G, width:16, height:16, cursor:"pointer" }}/>
+                  <label htmlFor="remember-t" style={{ fontSize:13, color:mu, cursor:"pointer", userSelect:"none" }}>Eslab qolish</label>
                 </div>
-                <div className="fb pt-1">
-                  <button type="submit" disabled={isLoading}
-                    className="btn-submit w-full py-3.5 px-4 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-55 disabled:cursor-not-allowed"
-                    style={{
-                      background: `linear-gradient(135deg, ${G} 0%, #059669 100%)`,
-                      boxShadow: `0 2px 4px rgba(0,0,0,0.2), 0 6px 22px rgba(16,185,129,0.38), inset 0 1px 0 rgba(255,255,255,0.15)`,
-                    }}>
-                    <div className="btn-glow" />
+
+                <div className="tl-fb">
+                  <button type="submit" disabled={isLoading} className="tl-btn" style={{ width:"100%", padding:"13px", borderRadius:13, border:"none", cursor:isLoading?"not-allowed":"pointer", background:`linear-gradient(135deg,${G} 0%,#059669 100%)`, boxShadow:"0 4px 20px rgba(16,185,129,0.40),inset 0 1px 0 rgba(255,255,255,0.15)", fontSize:14, fontWeight:700, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", gap:8, opacity:isLoading?.65:1 }}>
                     {isLoading ? (
-                      <>
-                        <SmallImageLoader size={16} />
-                        <span>Kirilmoqda...</span>
-                      </>
+                      <><div style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", animation:"tl-spin .8s linear infinite" }}/> Kirilmoqda...</>
                     ) : (
-                      <>
-                        <span>Tizimga Kirish</span>
-                        <ArrowRight size={15} className="arrow-icon" />
-                      </>
+                      <>Tizimga Kirish <ArrowRight size={15} className="tl-arrow"/></>
                     )}
                   </button>
                 </div>
               </form>
-              <div className="ff flex items-center gap-4 my-6">
-                <div className="div-line" style={{ background:isDarkMode?"rgba(255,255,255,0.06)":"rgba(16,185,129,0.1)" }} />
-                <span style={{ fontSize:11, color:isDarkMode?"rgba(255,255,255,0.2)":"#d1d5db" }}>yoki</span>
-                <div className="div-line" style={{ background:isDarkMode?"rgba(255,255,255,0.06)":"rgba(16,185,129,0.1)" }} />
+
+              <div className="tl-ff" style={{ display:"flex", alignItems:"center", gap:14, margin:"22px 0" }}>
+                <div style={{ flex:1, height:1, background: isDarkMode?"rgba(255,255,255,0.06)":"rgba(16,185,129,0.10)" }}/>
+                <span style={{ fontSize:11, color:mu }}>yoki</span>
+                <div style={{ flex:1, height:1, background: isDarkMode?"rgba(255,255,255,0.06)":"rgba(16,185,129,0.10)" }}/>
               </div>
 
-              <p className={`ff text-center text-sm ${isDarkMode ? "text-white/30" : "text-gray-400"}`}>
+              <p className="tl-ff" style={{ textAlign:"center", fontSize:13, color:mu }}>
                 Admin sifatida kirmoqchimisiz?{" "}
                 <a href="/login" style={{ color:G, fontWeight:600, textDecoration:"none" }}>Admin kirish</a>
               </p>
             </div>
 
-            <p className="ff text-center text-xs mt-5" style={{ color:isDarkMode?"rgba(255,255,255,0.15)":"#d1d5db" }}>
+            <p className="tl-ff" style={{ textAlign:"center", fontSize:11, color: isDarkMode?"rgba(255,255,255,0.14)":"#ccc", marginTop:18 }}>
               Tizimga kirib, siz{" "}
               <a href="#" style={{ textDecoration:"underline", textUnderlineOffset:3, color:"inherit" }}>foydalanish shartlari</a>
               {" "}ga rozilik bildirasiz.

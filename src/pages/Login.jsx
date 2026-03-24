@@ -2,25 +2,73 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
-import { SmallImageLoader } from "../components/ImageLoader";
+import { apiService } from "../services/api";
 import {
   Phone, Mail, Lock, Eye, EyeOff,
-  AlertCircle, ArrowRight, Users, BookOpen, TrendingUp, Shield,
+  AlertCircle, ArrowRight, Users, BookOpen,
+  TrendingUp, Shield, GraduationCap, Layers,
 } from "lucide-react";
-import icon from "../assets/image.png";
+
+function Counter({ target, suffix = "" }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    if (!target) return;
+    let start = null;
+    const duration = 1400;
+    const tick = (ts) => {
+      if (!start) start = ts;
+      const p = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(eased * target));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target]);
+  return <>{val.toLocaleString()}{suffix}</>;
+}
+
+const G = "#427A43";
 
 export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isDarkMode } = useTheme();
+  const { isDarkMode: D } = useTheme();
+  const { login, user, isLoading: authLoading } = useAuth();
+
   const [formData, setFormData] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   const [focused, setFocused] = useState("");
-  const { login, user } = useAuth();
+  const [dynStats, setDynStats] = useState({ students: 0, teachers: 0, groups: 0, courses: 0 });
+  const [statsLoaded, setStatsLoaded] = useState(false);
 
-  const isEmail = formData.identifier.includes("@");
+  // Redirect if already logged in - role bo'yicha avtomatik redirect
+  useEffect(() => {
+    if (!authLoading && user && user.role) {
+      console.log("User already logged in with role:", user.role);
+
+      // Role bo'yicha avtomatik redirect
+      switch (user.role) {
+        case 'admin':
+          console.log("Redirecting to admin panel");
+          navigate('/admin-panel', { replace: true });
+          break;
+        case 'teacher':
+          console.log("Redirecting to teacher panel");
+          navigate('/teacher-panel', { replace: true });
+          break;
+        case 'student':
+          console.log("Redirecting to student panel");
+          navigate('/students-panel', { replace: true });
+          break;
+        default:
+          console.error("Unknown role:", user.role);
+          // Role aniqlanmasa login sahifada qoladi
+          break;
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (location.state?.phone && location.state?.password) {
@@ -28,340 +76,264 @@ export default function Login() {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    if (user) {
-      if (user.role === "admin") navigate("/admin-panel");
-      else if (user.role === "teacher") navigate("/teachers");
-      else navigate("/profile");
-    }
-  }, [user, navigate]);
+  const isEmail = formData.identifier.includes("@");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    const identifier = formData.identifier.trim().replace(/\s/g, "");
+    if (!identifier) { setError("Telefon yoki email kiriting"); return; }
+    if (!formData.password) { setError("Parolni kiriting"); return; }
+
     setIsLoading(true);
     try {
-      const identifier = formData.identifier.trim().replace(/\s/g, "");
-
-      if (!identifier) {
-        setError("Telefon yoki email kiriting");
-        setIsLoading(false);
-        return;
-      }
-      if (!formData.password) {
-        setError("Parolni kiriting");
-        setIsLoading(false);
-        return;
-      }
-
-      console.log("Login identifier:", identifier);
       await login(identifier, formData.password);
+      // Login muvaffaqiyatli bo'lsa, useEffect ichidagi avtomatik redirect ishlaydi
+      // Shuning uchun bu yerda redirect qilmasligimiz kerak
     } catch (err) {
       console.error("Login error:", err);
-      setError(err instanceof Error ? err.message : "Kirishda xatolik yuz berdi");
+      // Backend'dan kelgan error message ni ko'rsatish
+      const errorMessage = err.message || "Kirishda xatolik yuz berdi. Iltimos qayta urinib ko'ring.";
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const inputWrapClass = (name) => {
-    const isFoc = focused === name;
-    const base = `input-wrap flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all duration-200 ${isFoc ? "is-focused" : ""}`;
-    const style = isFoc
-      ? isDarkMode
-        ? "bg-white/[0.07] border-[#427A43]/70 shadow-[0_0_0_3px_rgba(66,122,67,0.18)]"
-        : "bg-white border-[#427A43] shadow-[0_0_0_3px_rgba(66,122,67,0.12)]"
-      : isDarkMode
-        ? "bg-white/[0.03] border-white/[0.08] hover:border-[#427A43]/40 hover:bg-white/[0.05]"
-        : "bg-gray-50/80 border-gray-200 hover:border-[#427A43]/40 hover:bg-white";
-    return `${base} ${style}`;
-  };
+  const bg     = D ? "#070d07" : "#f3f7f3";
+  const cardBg = D ? "rgba(255,255,255,0.03)" : "#ffffff";
+  const cardBrd = D ? "rgba(255,255,255,0.06)" : "rgba(66,122,67,0.13)";
+  const mu     = D ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.40)";
+  const tx     = D ? "#f5f5f7" : "#111";
 
-  const stats = [
-    { Icon: Users,      value: "2,400+", label: "O'quvchilar" },
-    { Icon: BookOpen,   value: "48",     label: "Guruhlar"    },
-    { Icon: TrendingUp, value: "99.9%",  label: "Uptime"      },
+  const inpBg = (isFoc) => D
+    ? isFoc ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)"
+    : isFoc ? "#fff" : "rgba(66,122,67,0.03)";
+  const inpBrd = (isFoc) => isFoc ? G : D ? "rgba(255,255,255,0.08)" : "rgba(66,122,67,0.15)";
+  const inpShadow = (isFoc) => isFoc ? "0 0 0 3px rgba(66,122,67,0.14)" : "none";
+
+  const statItems = [
+    { icon: GraduationCap, label: "O'quvchilar",   value: dynStats.students, suffix: "+" },
+    { icon: Users,          label: "O'qituvchilar", value: dynStats.teachers, suffix: ""  },
+    { icon: Layers,         label: "Guruhlar",      value: dynStats.groups,   suffix: ""  },
+    { icon: BookOpen,       label: "Kurslar",       value: dynStats.courses,  suffix: ""  },
   ];
 
   const features = [
-    { Icon: Users,      title: "O'quvchilar boshqaruvi", desc: "Ro'yxat, davomat va to'lovlarni kuzating"    },
-    { Icon: BookOpen,   title: "Guruh va jadvallar",      desc: "Dars jadvali, guruh tarkibi, o'qituvchilar" },
-    { Icon: TrendingUp, title: "Hisobot va statistika",   desc: "Real-vaqt ma'lumotlari va moliyaviy tahlil" },
-    { Icon: Shield,     title: "Xavfsiz tizim",           desc: "Ma'lumotlaringiz to'liq himoyalangan"       },
+    { icon: Users,      title: "O'quvchilar boshqaruvi", desc: "Ro'yxat, davomat va to'lovlarni kuzating"    },
+    { icon: BookOpen,   title: "Guruh va jadvallar",      desc: "Dars jadvali, guruh tarkibi, o'qituvchilar" },
+    { icon: TrendingUp, title: "Hisobot va statistika",   desc: "Real-vaqt ma'lumotlari va moliyaviy tahlil" },
+    { icon: Shield,     title: "Xavfsiz tizim",           desc: "Ma'lumotlaringiz to'liq himoyalangan"       },
   ];
-
-  const G = "#427A43";
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
-        .login-root * { font-family:'Geist',system-ui,sans-serif; }
-        .grid-bg      { background-image:linear-gradient(rgba(66,122,67,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(66,122,67,0.05) 1px,transparent 1px); background-size:44px 44px; }
-        .grid-bg-dark { background-image:linear-gradient(rgba(66,122,67,0.08) 1px,transparent 1px),linear-gradient(90deg,rgba(66,122,67,0.08) 1px,transparent 1px); background-size:44px 44px; }
-        .glow-orb { position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none; }
-        .noise-overlay { background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E"); opacity:0.02;pointer-events:none; }
-        .input-field { transition:all 0.18s ease;letter-spacing:0.01em; }
-        .input-field:focus { outline:none; }
-        .input-wrap { position:relative;transition:all 0.22s cubic-bezier(0.4,0,0.2,1); }
-        .input-wrap::after { content:'';position:absolute;inset:-1px;border-radius:13px;opacity:0;transition:opacity 0.25s;pointer-events:none;background:linear-gradient(135deg,rgba(66,122,67,0.5),rgba(90,158,91,0.28));z-index:-1;filter:blur(9px); }
-        .input-wrap.is-focused::after { opacity:1; }
-        .input-wrap:hover,.input-wrap.is-focused { transform:translateY(-1px); }
-        .btn-submit { position:relative;overflow:hidden;transition:all 0.22s cubic-bezier(0.4,0,0.2,1);letter-spacing:0.03em; }
-        .btn-submit::before { content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 55%);opacity:0;transition:opacity 0.22s; }
-        .btn-glow { position:absolute;inset:-4px;border-radius:16px;background:linear-gradient(135deg,#427A43,#5a9e5b,#2e5a2f);opacity:0;z-index:-1;filter:blur(14px);transition:opacity 0.3s; }
-        .btn-submit:hover .btn-glow { opacity:0.8; }
-        .btn-submit:hover::before { opacity:1; }
-        .btn-submit:hover { transform:translateY(-2px);box-shadow:0 14px 44px rgba(66,122,67,0.5) !important; }
-        .btn-submit:active { transform:scale(0.973) translateY(0); }
-        .btn-submit .arrow-icon { transition:transform 0.2s; }
-        .btn-submit:hover .arrow-icon { transform:translateX(5px); }
-        .login-card { position:relative;transition:box-shadow 0.35s,transform 0.35s; }
-        .login-card::before { content:'';position:absolute;inset:0;border-radius:17px;background:linear-gradient(135deg,rgba(66,122,67,0.2) 0%,rgba(90,158,91,0.07) 50%,transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;pointer-events:none;opacity:0;transition:opacity 0.4s; }
-        .login-card:hover::before { opacity:1; }
-        .login-card:hover { transform:translateY(-3px); }
-        .stat-card { border-radius:14px;padding:16px;transition:transform 0.2s; }
-        .stat-card:hover { transform:translateY(-2px); }
-        .feat-icon { width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
-        .feat-row { display:flex;align-items:flex-start;gap:13px;padding:13px 0; }
-        .feat-row+.feat-row { border-top:1px solid; }
-        .card-enter { animation:cardEnter 0.65s cubic-bezier(0.16,1,0.3,1) forwards; }
-        @keyframes cardEnter { from{opacity:0;transform:translateY(30px) scale(0.97)} to{opacity:1;transform:translateY(0) scale(1)} }
-        .lp-1{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.08s both}
-        .lp-2{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.18s both}
-        .lp-3{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.28s both}
-        .lp-4{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.38s both}
-        .lp-5{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.48s both}
-        .logo-enter{animation:fu 0.5s cubic-bezier(0.16,1,0.3,1) 0.05s both}
-        .h-enter{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.12s both}
-        .f1{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.20s both}
-        .f2{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.28s both}
-        .f3{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.34s both}
-        .fb{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.40s both}
-        .ff{animation:fu 0.4s cubic-bezier(0.16,1,0.3,1) 0.46s both}
-        @keyframes fu { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .field-label { font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase; }
-        .div-line { flex:1;height:1px; }
-        .type-badge { display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px; }
+        .lg-root{-webkit-font-smoothing:antialiased}
+        .lg-grid{background-image:linear-gradient(rgba(66,122,67,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(66,122,67,0.06) 1px,transparent 1px);background-size:44px 44px}
+        .lg-orb{position:absolute;border-radius:50%;filter:blur(88px);pointer-events:none}
+        @keyframes lg-up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+        @keyframes lg-in{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+        @keyframes lg-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.85)}}
+        .lg-fu-1{animation:lg-up .55s ease .05s both}.lg-fu-2{animation:lg-up .55s ease .12s both}
+        .lg-fu-3{animation:lg-up .55s ease .20s both}.lg-fu-4{animation:lg-up .55s ease .28s both}
+        .lg-fu-5{animation:lg-up .55s ease .36s both}.lg-card{animation:lg-in .6s cubic-bezier(.16,1,.3,1) .06s both}
+        .lg-f1{animation:lg-up .4s ease .18s both}.lg-f2{animation:lg-up .4s ease .26s both}
+        .lg-f3{animation:lg-up .4s ease .32s both}.lg-fb{animation:lg-up .4s ease .38s both}
+        .lg-ff{animation:lg-up .4s ease .44s both}
+        .lg-inp{transition:background .2s,border-color .2s,box-shadow .2s,transform .2s}
+        .lg-inp:hover{transform:translateY(-1px)}
+        .lg-btn{position:relative;overflow:hidden;transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s}
+        .lg-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.18) 0%,transparent 55%);opacity:0;transition:opacity .2s}
+        .lg-btn:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(66,122,67,0.48)!important}
+        .lg-btn:hover::before{opacity:1}.lg-btn:active{transform:scale(0.97)}
+        .lg-btn .lg-arrow{transition:transform .2s}.lg-btn:hover .lg-arrow{transform:translateX(5px)}
+        .lg-stat{transition:transform .22s cubic-bezier(.34,1.56,.64,1);border-radius:16px;padding:16px}
+        .lg-stat:hover{transform:translateY(-3px)}
+        .lg-feat{display:flex;align-items:flex-start;gap:13px;padding:12px 0}
+        .lg-feat+.lg-feat{border-top:1px solid}
+        .lg-feat-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .lg-pulse-dot{animation:lg-pulse 2s ease-in-out infinite}
+        .lg-divider{flex:1;height:1px}
+        .lg-card-glow{position:absolute;inset:0;border-radius:17px;background:linear-gradient(135deg,rgba(66,122,67,0.22) 0%,rgba(90,158,91,0.07) 50%,transparent 100%);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1px;pointer-events:none;opacity:0;transition:opacity .35s}
+        .lg-card:hover .lg-card-glow{opacity:1}.lg-card:hover{transform:translateY(-2px)}.lg-card{transition:transform .3s}
+        .lg-type-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px}
+        .lg-link{color:${G};font-weight:600;text-decoration:none}.lg-link:hover{text-decoration:underline;text-underline-offset:3px}
+        .lg-left-panel{display:none}@media(min-width:1024px){.lg-left-panel{display:flex!important}}
+        .mobile-brand{display:flex}@media(min-width:1024px){.mobile-brand{display:none!important}}
+        @keyframes lg-spin{to{transform:rotate(360deg)}}
       `}</style>
 
-      <div className={`login-root min-h-screen relative overflow-hidden flex ${isDarkMode ? "bg-[#070d07]" : "bg-[#f3f7f3]"}`}>
-        <div className="absolute inset-0 noise-overlay z-0" />
-        <div className={`absolute inset-0 z-0 ${isDarkMode ? "grid-bg-dark" : "grid-bg"}`} />
-        <div className="glow-orb z-0" style={{ width:700,height:700,top:-180,left:-180,background:isDarkMode?"radial-gradient(circle,rgba(66,122,67,0.22) 0%,transparent 70%)":"radial-gradient(circle,rgba(66,122,67,0.11) 0%,transparent 70%)" }} />
-        <div className="glow-orb z-0" style={{ width:500,height:500,bottom:-120,right:-80,background:isDarkMode?"radial-gradient(circle,rgba(66,122,67,0.14) 0%,transparent 70%)":"radial-gradient(circle,rgba(66,122,67,0.07) 0%,transparent 70%)" }} />
+      <div className="lg-root" style={{ minHeight:"100vh", position:"relative", overflow:"hidden", display:"flex", background:bg }}>
+        <div className="lg-grid" style={{ position:"absolute", inset:0, zIndex:0 }} />
+        <div className="lg-orb" style={{ width:680, height:680, top:-180, left:-160, zIndex:0, background: D ? "radial-gradient(circle,rgba(66,122,67,0.22) 0%,transparent 70%)" : "radial-gradient(circle,rgba(66,122,67,0.10) 0%,transparent 70%)" }} />
+        <div className="lg-orb" style={{ width:480, height:480, bottom:-120, right:-80, zIndex:0, background: D ? "radial-gradient(circle,rgba(66,122,67,0.14) 0%,transparent 70%)" : "radial-gradient(circle,rgba(66,122,67,0.07) 0%,transparent 70%)" }} />
 
-        {/* ══ LEFT PANEL ══ */}
-        <div className={`hidden lg:flex flex-col justify-between w-[48%] p-12 relative z-10 border-r overflow-y-auto ${isDarkMode ? "border-white/[0.05]" : "border-[#427A43]/10"}`}>
-          <div className="lp-1 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${isDarkMode ? "bg-[#427A43]/20" : "bg-white shadow-[#427A43]/15"}`}>
-              <img src={icon} alt="logo" className="w-6 h-6 object-contain" />
+        {/* LEFT PANEL */}
+        <div style={{ flexDirection:"column", justifyContent:"space-between", width:"48%", padding:"48px 52px", position:"relative", zIndex:10, borderRight:`1px solid ${D?"rgba(255,255,255,0.05)":"rgba(66,122,67,0.10)"}`, overflowY:"auto" }} className="lg-left-panel">
+          <div className="lg-fu-1" style={{ display:"flex", alignItems:"center", gap:12 }}>
+            <div style={{ width:40, height:40, borderRadius:13, background:`linear-gradient(135deg,#2d5630,${G})`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 14px rgba(66,122,67,0.30)" }}>
+              <GraduationCap size={19} color="#fff" />
             </div>
             <div>
-              <p className={`text-sm font-bold leading-none ${isDarkMode ? "text-white" : "text-gray-900"}`}>Codingclub</p>
-              <p style={{ fontSize:10,marginTop:2,color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(66,122,67,0.6)" }}>O'quv Markazi</p>
+              <p style={{ fontSize:16, color:G, lineHeight:1 }}>CodingClub</p>
+              <p style={{ fontSize:10, color:mu, marginTop:2, fontWeight:500 }}>O'quv Markazi</p>
             </div>
           </div>
 
-          <div className="my-8">
-            <div className="lp-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-8"
-              style={{ background:isDarkMode?"rgba(66,122,67,0.12)":"rgba(66,122,67,0.08)",border:`1px solid ${isDarkMode?"rgba(66,122,67,0.28)":"rgba(66,122,67,0.18)"}`,color:G }}>
-              <span style={{ width:6,height:6,borderRadius:"50%",background:G,display:"inline-block" }} className="animate-pulse" />
-              Boshqaruv tizimi — v2.0
+          <div style={{ margin:"40px 0" }}>
+            <div className="lg-fu-2" style={{ display:"inline-flex", alignItems:"center", gap:7, padding:"6px 12px", borderRadius:99, marginBottom:28, background: D?"rgba(66,122,67,0.12)":"rgba(66,122,67,0.08)", border:`1px solid ${D?"rgba(66,122,67,0.28)":"rgba(66,122,67,0.18)"}` }}>
+              <span className="lg-pulse-dot" style={{ width:7, height:7, borderRadius:"50%", background:G, display:"inline-block" }} />
+              <span style={{ fontSize:11, fontWeight:700, color:G, letterSpacing:"0.04em" }}>Boshqaruv tizimi — faol</span>
             </div>
-
-            <h2 className={`lp-3 font-extrabold leading-[1.12] tracking-tight mb-4 ${isDarkMode ? "text-white" : "text-gray-900"}`} style={{ fontSize:34 }}>
-              Codingclub<br />
+            <h2 className="lg-fu-3" style={{ fontSize:34, fontWeight:800, lineHeight:1.12, letterSpacing:"-0.02em", marginBottom:14, color:tx }}>
+              CodingClub<br />
               <span style={{ color:G }}>O'quv Markazi</span><br />
-              <span style={{ fontWeight:300,fontSize:26,color:isDarkMode?"rgba(255,255,255,0.28)":"#c0c0c0" }}>Boshqaruv Paneli</span>
+              <span style={{ fontWeight:400, fontSize:28, color: D?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.22)" }}>Boshqaruv Paneli</span>
             </h2>
-
-            <p className="lp-3 text-sm leading-relaxed mb-8 max-w-[290px]" style={{ color:isDarkMode?"rgba(255,255,255,0.38)":"#9ca3af" }}>
+            <p className="lg-fu-3" style={{ fontSize:13.5, lineHeight:1.7, marginBottom:32, maxWidth:300, color:mu }}>
               Guruhlar, o'qituvchilar va o'quvchilarni bitta qulay tizimdan boshqaring.
             </p>
-
-            <div className="lp-4 grid grid-cols-3 gap-3 mb-8">
-              {stats.map(({ Icon, value, label }) => (
-                <div key={label} className="stat-card"
-                  style={{ background:isDarkMode?"rgba(66,122,67,0.09)":"rgba(66,122,67,0.06)",border:`1px solid ${isDarkMode?"rgba(66,122,67,0.16)":"rgba(66,122,67,0.12)"}` }}>
-                  <Icon size={15} color={G} style={{ marginBottom:8 }} />
-                  <p className={`text-xl font-bold tracking-tight ${isDarkMode ? "text-white" : "text-gray-900"}`}>{value}</p>
-                  <p style={{ fontSize:11,marginTop:2,color:isDarkMode?"rgba(255,255,255,0.28)":"#9ca3af" }}>{label}</p>
+            <div className="lg-fu-4" style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:10, marginBottom:32 }}>
+              {statItems.map(({ icon:Icon, label, value, suffix }, i) => (
+                <div key={label} className="lg-stat" style={{ background: D?"rgba(66,122,67,0.09)":"rgba(66,122,67,0.06)", border:`1px solid ${D?"rgba(66,122,67,0.16)":"rgba(66,122,67,0.12)"}`, animation:`lg-up 0.5s ease ${0.28+i*0.07}s both` }}>
+                  <Icon size={14} color={G} style={{ marginBottom:8 }} />
+                  <p style={{ fontSize:24, fontWeight:800, letterSpacing:"-0.02em", color:tx, lineHeight:1 }}>
+                    {statsLoaded ? <Counter target={value} suffix={suffix} /> : <span style={{ opacity:0.3 }}>—</span>}
+                  </p>
+                  <p style={{ fontSize:11, marginTop:4, color:mu, fontWeight:500 }}>{label}</p>
                 </div>
               ))}
             </div>
-
-            <div className="lp-5">
-              {features.map(({ Icon, title, desc }, i) => (
-                <div key={i} className="feat-row" style={{ borderColor:isDarkMode?"rgba(255,255,255,0.05)":"rgba(66,122,67,0.08)" }}>
-                  <div className="feat-icon" style={{ background:isDarkMode?"rgba(66,122,67,0.12)":"rgba(66,122,67,0.08)" }}>
+            <div className="lg-fu-5">
+              {features.map(({ icon:Icon, title, desc }, i) => (
+                <div key={i} className="lg-feat" style={{ borderColor: D?"rgba(255,255,255,0.05)":"rgba(66,122,67,0.08)" }}>
+                  <div className="lg-feat-icon" style={{ background: D?"rgba(66,122,67,0.12)":"rgba(66,122,67,0.08)" }}>
                     <Icon size={15} color={G} />
                   </div>
                   <div>
-                    <p className={`text-sm font-semibold ${isDarkMode ? "text-white/85" : "text-gray-800"}`}>{title}</p>
-                    <p style={{ fontSize:12,marginTop:2,color:isDarkMode?"rgba(255,255,255,0.3)":"#9ca3af",lineHeight:1.5 }}>{desc}</p>
+                    <p style={{ fontSize:13, fontWeight:600, color:tx }}>{title}</p>
+                    <p style={{ fontSize:12, marginTop:2, color:mu, lineHeight:1.55 }}>{desc}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
-          <div className="lp-5 flex items-center gap-2" style={{ color:isDarkMode?"rgba(255,255,255,0.15)":"#d1d5db",fontSize:12 }}>
-            <span style={{ width:6,height:6,borderRadius:"50%",background:G,opacity:0.5,display:"inline-block" }} />
-            © 2024 Codingclub. Barcha huquqlar himoyalangan.
-          </div>
+          <p className="lg-fu-5" style={{ fontSize:12, color: D?"rgba(255,255,255,0.15)":"#ccc" }}>© {new Date().getFullYear()} CodingClub. Barcha huquqlar himoyalangan.</p>
         </div>
 
-        {/* ══ RIGHT PANEL ══ */}
-        <div className="flex-1 flex items-center justify-center p-6 relative z-10">
-          <div className="w-full max-w-[400px]">
-
-            {/* Mobile logo */}
-            <div className="lg:hidden flex items-center gap-2.5 mb-10 logo-enter">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDarkMode ? "bg-[#427A43]/20" : "bg-white shadow-sm"}`}>
-                <img src={icon} alt="logo" className="w-5 h-5 object-contain" />
+        {/* RIGHT PANEL */}
+        <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:24, position:"relative", zIndex:10 }}>
+          <div style={{ width:"100%", maxWidth:400 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:32 }} className="lg-fu-1 mobile-brand">
+              <div style={{ width:36, height:36, borderRadius:11, background:`linear-gradient(135deg,#2d5630,${G})`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 4px 12px rgba(66,122,67,0.28)" }}>
+                <GraduationCap size={16} color="#fff" />
               </div>
               <div>
-                <p className={`text-sm font-bold leading-none ${isDarkMode ? "text-white" : "text-gray-900"}`}>Codingclub</p>
-                <p style={{ fontSize:10,marginTop:2,color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(66,122,67,0.6)" }}>O'quv Markazi Boshqaruv Tizimi</p>
+                <p style={{ fontSize:15, color:G, lineHeight:1 }}>CodingClub</p>
+                <p style={{ fontSize:10, color:mu, marginTop:1, fontWeight:500 }}>O'quv Markazi Boshqaruv Tizimi</p>
               </div>
             </div>
 
-            <div className={`login-card card-enter rounded-2xl p-8 border ${
-              isDarkMode
-                ? "bg-white/[0.03] border-white/[0.06] shadow-[0_24px_80px_rgba(0,0,0,0.7)]"
-                : "bg-white shadow-[0_8px_48px_rgba(66,122,67,0.10),inset_0_1px_0_rgba(255,255,255,1)]"
-            }`} style={{ borderColor:isDarkMode?"rgba(255,255,255,0.06)":"rgba(66,122,67,0.12)" }}>
-
-              <div className="h-enter mb-7">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background:"rgba(66,122,67,0.1)" }}>
-                    <img src={icon} alt="logo" className="w-4 h-4 object-contain" />
+            <div className="lg-card" style={{ borderRadius:22, padding:"32px 32px 28px", background:cardBg, border:`1px solid ${cardBrd}`, boxShadow: D?"0 24px 80px rgba(0,0,0,0.70)":"0 8px 48px rgba(66,122,67,0.10),inset 0 1px 0 rgba(255,255,255,1)", position:"relative" }}>
+              <div className="lg-card-glow" />
+              <div className="lg-fu-1" style={{ marginBottom:28 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                  <div style={{ width:28, height:28, borderRadius:9, background:"rgba(66,122,67,0.10)", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <GraduationCap size={14} color={G} />
                   </div>
-                  <span style={{ fontSize:12,fontWeight:600,color:isDarkMode?"rgba(255,255,255,0.35)":"rgba(66,122,67,0.65)" }}>
-                    Codingclub Admin
-                  </span>
+                  <span style={{ fontSize:11, fontWeight:700, color:mu, letterSpacing:"0.05em" }}>CODINGCLUB ADMIN</span>
                 </div>
-                <h1 className={`text-xl font-bold tracking-tight mb-1 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-                  Tizimga kirish
-                </h1>
-                <p style={{ fontSize:13.5,color:isDarkMode?"rgba(255,255,255,0.35)":"#9ca3af" }}>
-                  Admin — telefon, O'qituvchi — email bilan
-                </p>
+                <h1 style={{ fontSize:22, fontWeight:800, letterSpacing:"-0.02em", color:tx, marginBottom:5 }}>Tizimga kirish</h1>
+                <p style={{ fontSize:13, color:mu, lineHeight:1.6 }}>Telefon yoki email bilan kirish - role bo'yicha avtomatik panelga yuboriladi</p>
               </div>
 
               {error && (
-                <div className={`mb-5 flex items-start gap-3 p-3.5 rounded-xl text-sm border ${
-                  isDarkMode ? "bg-red-500/8 border-red-500/20 text-red-400" : "bg-red-50 border-red-100 text-red-600"
-                }`}>
-                  <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                <div style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"12px 14px", borderRadius:12, marginBottom:20, background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.22)" }}>
+                  <AlertCircle size={14} color="#ef4444" style={{ flexShrink:0, marginTop:1 }} />
+                  <span style={{ fontSize:13, color:"#ef4444", lineHeight:1.5 }}>{error}</span>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-
-                {/* ── Identifier (phone or email) ── */}
-                <div className="f1">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="field-label" style={{ color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(66,122,67,0.55)" }}>
-                      Telefon yoki Email
-                    </label>
+              <form onSubmit={handleSubmit} style={{ display:"flex", flexDirection:"column", gap:16 }}>
+                <div className="lg-f1">
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:7 }}>
+                    <label style={{ fontSize:10, fontWeight:800, color:mu, textTransform:"uppercase", letterSpacing:"0.07em" }}>Telefon yoki Email</label>
                     {formData.identifier && (
-                      <span className="type-badge" style={{
-                        background: isEmail ? "rgba(59,130,246,0.1)" : "rgba(66,122,67,0.1)",
-                        color: isEmail ? "#3b82f6" : G,
-                        border: `1px solid ${isEmail ? "rgba(59,130,246,0.2)" : "rgba(66,122,67,0.2)"}`,
-                      }}>
+                      <span className="lg-type-badge" style={{ background: isEmail?"rgba(59,130,246,0.10)":"rgba(66,122,67,0.10)", color: isEmail?"#3b82f6":G, border:`1px solid ${isEmail?"rgba(59,130,246,0.20)":"rgba(66,122,67,0.20)"}` }}>
                         {isEmail ? <><Mail size={9}/> Email</> : <><Phone size={9}/> Telefon</>}
                       </span>
                     )}
                   </div>
-                  <div className={inputWrapClass("identifier")}>
+                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="identifier"), border:`1px solid ${inpBrd(focused==="identifier")}`, boxShadow:inpShadow(focused==="identifier") }}>
                     {isEmail
-                      ? <Mail size={15} style={{ flexShrink:0,color:focused==="identifier"?G:isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db",transition:"color 0.15s" }} />
-                      : <Phone size={15} style={{ flexShrink:0,color:focused==="identifier"?G:isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db",transition:"color 0.15s" }} />
+                      ? <Mail size={15} color={focused==="identifier"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
+                      : <Phone size={15} color={focused==="identifier"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
                     }
-                    <input
-                      type="text"
-                      required
-                      value={formData.identifier}
-                      onChange={e => setFormData({ ...formData, identifier: e.target.value })}
-                      onFocus={() => setFocused("identifier")}
-                      onBlur={() => setFocused("")}
-                      placeholder="+998901234567 yoki email@gmail.com"
-                      autoComplete="username"
-                      className={`input-field flex-1 bg-transparent text-sm ${isDarkMode ? "text-white placeholder-white/20" : "text-gray-900 placeholder-gray-300"}`}
+                    <input type="text" required value={formData.identifier}
+                      onChange={e => setFormData({...formData, identifier:e.target.value})}
+                      onFocus={() => setFocused("identifier")} onBlur={() => setFocused("")}
+                      placeholder="+998901234567 yoki email@gmail.com" autoComplete="username"
+                      style={{ flex:1, background:"transparent", border:"none", outline:"none", fontSize:13, color:tx }}
                     />
                   </div>
                 </div>
 
-                {/* ── Password ── */}
-                <div className="f2">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="field-label" style={{ color:isDarkMode?"rgba(255,255,255,0.3)":"rgba(66,122,67,0.55)" }}>Parol</label>
-                    <a href="#" style={{ fontSize:12,fontWeight:600,color:G,textDecoration:"none" }}>Unutdingizmi?</a>
+                <div className="lg-f2">
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:7 }}>
+                    <label style={{ fontSize:10, fontWeight:800, color:mu, textTransform:"uppercase", letterSpacing:"0.07em" }}>Parol</label>
+                    <a href="#" className="lg-link" style={{ fontSize:12 }}>Unutdingizmi?</a>
                   </div>
-                  <div className={inputWrapClass("password")}>
-                    <Lock size={15} style={{ flexShrink:0,color:focused==="password"?G:isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db",transition:"color 0.15s" }} />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={formData.password}
-                      onChange={e => setFormData({ ...formData, password: e.target.value })}
-                      onFocus={() => setFocused("password")}
-                      onBlur={() => setFocused("")}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      className={`input-field flex-1 bg-transparent text-sm ${isDarkMode ? "text-white placeholder-white/20" : "text-gray-900 placeholder-gray-300"}`}
+                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="password"), border:`1px solid ${inpBrd(focused==="password")}`, boxShadow:inpShadow(focused==="password") }}>
+                    <Lock size={15} color={focused==="password"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
+                    <input type={showPass?"text":"password"} required value={formData.password}
+                      onChange={e => setFormData({...formData, password:e.target.value})}
+                      onFocus={() => setFocused("password")} onBlur={() => setFocused("")}
+                      placeholder="••••••••" autoComplete="current-password"
+                      style={{ flex:1, background:"transparent", border:"none", outline:"none", fontSize:13, color:tx }}
                     />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)}
-                      style={{ flexShrink:0,color:isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db",background:"none",border:"none",cursor:"pointer",transition:"color 0.15s" }}
+                    <button type="button" onClick={() => setShowPass(!showPass)}
+                      style={{ background:"none", border:"none", cursor:"pointer", color:mu, flexShrink:0, padding:0, transition:"color .15s" }}
                       onMouseOver={e => e.currentTarget.style.color=G}
-                      onMouseOut={e => e.currentTarget.style.color=isDarkMode?"rgba(255,255,255,0.22)":"#d1d5db"}>
-                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      onMouseOut={e => e.currentTarget.style.color=mu}>
+                      {showPass ? <EyeOff size={15}/> : <Eye size={15}/>}
                     </button>
                   </div>
                 </div>
 
-                <div className="f3 flex items-center gap-2.5 pt-0.5">
-                  <input type="checkbox" id="remember" style={{ accentColor:G,width:16,height:16,cursor:"pointer" }} />
-                  <label htmlFor="remember" className={`text-sm cursor-pointer select-none ${isDarkMode ? "text-white/40" : "text-gray-400"}`}>
-                    Eslab qolish
-                  </label>
+                <div className="lg-f3" style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <input type="checkbox" id="remember" style={{ accentColor:G, width:16, height:16, cursor:"pointer" }}/>
+                  <label htmlFor="remember" style={{ fontSize:13, color:mu, cursor:"pointer", userSelect:"none" }}>Eslab qolish</label>
                 </div>
 
-                <div className="fb pt-1">
-                  <button type="submit" disabled={isLoading}
-                    className="btn-submit w-full py-3.5 px-4 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-55 disabled:cursor-not-allowed"
-                    style={{ background:`linear-gradient(135deg, ${G} 0%, #2e5a2f 100%)`,boxShadow:`0 2px 4px rgba(0,0,0,0.2), 0 6px 22px rgba(66,122,67,0.38), inset 0 1px 0 rgba(255,255,255,0.15)` }}>
-                    <div className="btn-glow" />
+                <div className="lg-fb">
+                  <button type="submit" disabled={isLoading} className="lg-btn" style={{ width:"100%", padding:"13px", borderRadius:13, border:"none", cursor:isLoading?"not-allowed":"pointer", background:`linear-gradient(135deg,#2d5630 0%,${G} 60%,#5a9e5b 100%)`, boxShadow:"0 4px 20px rgba(66,122,67,0.40),inset 0 1px 0 rgba(255,255,255,0.15)", fontSize:14, fontWeight:700, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", gap:8, opacity:isLoading?.65:1 }}>
                     {isLoading ? (
-                      <><SmallImageLoader size={16} /><span>Kirilmoqda...</span></>
+                      <><div style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.3)", borderTopColor:"#fff", animation:"lg-spin .8s linear infinite" }}/> Kirilmoqda...</>
                     ) : (
-                      <><span>Tizimga Kirish</span><ArrowRight size={15} className="arrow-icon" /></>
+                      <>Tizimga Kirish <ArrowRight size={15} className="lg-arrow"/></>
                     )}
                   </button>
                 </div>
               </form>
 
-              <div className="ff flex items-center gap-4 my-6">
-                <div className="div-line" style={{ background:isDarkMode?"rgba(255,255,255,0.06)":"rgba(66,122,67,0.1)" }} />
-                <span style={{ fontSize:11,color:isDarkMode?"rgba(255,255,255,0.2)":"#d1d5db" }}>yoki</span>
-                <div className="div-line" style={{ background:isDarkMode?"rgba(255,255,255,0.06)":"rgba(66,122,67,0.1)" }} />
+              <div className="lg-ff" style={{ display:"flex", alignItems:"center", gap:14, margin:"22px 0" }}>
+                <div className="lg-divider" style={{ background: D?"rgba(255,255,255,0.06)":"rgba(66,122,67,0.10)" }}/>
+                <span style={{ fontSize:11, color:mu, whiteSpace:"nowrap" }}>yoki</span>
+                <div className="lg-divider" style={{ background: D?"rgba(255,255,255,0.06)":"rgba(66,122,67,0.10)" }}/>
               </div>
 
-              <p className={`ff text-center text-sm ${isDarkMode ? "text-white/30" : "text-gray-400"}`}>
+              <p className="lg-ff" style={{ textAlign:"center", fontSize:13, color:mu }}>
                 Akkauntingiz yo'qmi?{" "}
-                <a href="/register" style={{ color:G,fontWeight:600,textDecoration:"none" }}>Ro'yxatdan o'ting</a>
-                {" | "}
-                <a href="/teacher-login" style={{ color:G,fontWeight:600,textDecoration:"none" }}>O'qituvchi kirish</a>
+                <a href="/register" className="lg-link">Ro'yxatdan o'ting</a>
+                <span style={{ margin:"0 6px", opacity:0.4 }}>|</span>
+                <a href="/teacher-login" className="lg-link">O'qituvchi kirish</a>
               </p>
             </div>
 
-            <p className="ff text-center text-xs mt-5" style={{ color:isDarkMode?"rgba(255,255,255,0.15)":"#d1d5db" }}>
+            <p className="lg-ff" style={{ textAlign:"center", fontSize:11, color: D?"rgba(255,255,255,0.14)":"#ccc", marginTop:18 }}>
               Tizimga kirib, siz{" "}
-              <a href="#" style={{ textDecoration:"underline",textUnderlineOffset:3,color:"inherit" }}>foydalanish shartlari</a>
+              <a href="#" style={{ textDecoration:"underline", textUnderlineOffset:3, color:"inherit" }}>foydalanish shartlari</a>
               {" "}ga rozilik bildirasiz.
             </p>
           </div>

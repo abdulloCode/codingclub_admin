@@ -40,14 +40,7 @@ export default function TeacherRegister() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState("");
-  const { register, user } = useAuth();
-
-  useEffect(() => {
-    if (user) {
-      if (user.role === "teacher") navigate("/teachers");
-      else navigate("/admin-panel");
-    }
-  }, [user, navigate]);
+  const { register, teacherLogin, user } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,10 +50,15 @@ export default function TeacherRegister() {
       console.log("Teacher register form data:", formData);
       const response = await register(formData.name, formData.phone, formData.password);
       console.log("Teacher register response:", response);
+
+      // Register'dan keyin avtomatik login qilish - teacherLogin metodini ishlatamiz
+      await teacherLogin(formData.phone, formData.password);
+
+      // Redirect
       setSuccess("Ro'yxatdan o'tdingiz! Tizimga kiring.");
       setTimeout(() => {
-        navigate("/teacher-login");
-      }, 2000);
+        navigate("/teacher-panel", { replace: true });
+      }, 1500);
     } catch (err) {
       console.error("Teacher register error:", err);
       setError(err instanceof Error ? err.message : "Ro'yxatdan o'tishda xatolik yuz berdi");
@@ -99,8 +97,7 @@ export default function TeacherRegister() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&display=swap');
-        .reg-root * { font-family:'Geist',system-ui,sans-serif; }
+        .reg-root {}
 
         .grid-bg      { background-image:linear-gradient(rgba(16,185,129,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.04) 1px,transparent 1px); background-size:40px 40px; }
         .grid-bg-dark { background-image:linear-gradient(rgba(16,185,129,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(16,185,129,0.07) 1px,transparent 1px); background-size:40px 40px; }
