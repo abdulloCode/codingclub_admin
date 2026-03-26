@@ -12,7 +12,10 @@
       "Bash(start:*)",
       "Bash(curl:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx eslint:*)",
+      "Bash(node:*)",
+      "Bash(npm start:*)"
     ]
   }
 }

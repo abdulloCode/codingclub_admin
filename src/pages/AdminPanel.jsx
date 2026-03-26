@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiService } from '../services/api';
 
-// ── Authentication tekshiruv ─────────────────────────────────────────
+
 const useRequireAuth = (requiredRole) => {
   const { isAuthenticated, user, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -12,7 +12,6 @@ const useRequireAuth = (requiredRole) => {
   useEffect(() => {
     if (isLoading) return;
 
-    // Agar user authenticated bo'lmasa yoki noto'g'ri role bo'lsa, login sahifasiga yuborish
     if (!isAuthenticated || user?.role !== requiredRole) {
       console.log(`useRequireAuth - User not authenticated with role ${requiredRole}, redirecting to login`);
       navigate('/login', { replace: true });
@@ -30,17 +29,14 @@ import {
   Calendar, Clock, ChevronLeft, Award,
 } from 'lucide-react';
 
-// ─── BRAND COLORS ──────────────────────────────────────────
 const B  = '#427A43';
 const BL = '#5a9e5b';
 const BD = '#2d5630';
 const fmt = n => new Intl.NumberFormat('uz-UZ').format(n ?? 0);
 
-// ─── CHART DATA ──────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const SCORES = [62, 45, 78, 55, 88, 95, 70, 82, 60, 75, 68, 80];
 
-// ─── LEADERBOARD DATA (will be fetched from API) ─────────────
 const LEADERBOARD_DEFAULT = [
   { name: 'Aziza Jaloil',    course: 'Frontend', progress: 78, pct: 92, avatar: 'AJ' },
   { name: 'Jasurbek Rahimov',course: 'Backend',  progress: 62, pct: 87, avatar: 'JR' },
@@ -48,7 +44,6 @@ const LEADERBOARD_DEFAULT = [
   { name: 'Sherzod Mirzaev', course: 'DevOps',   progress: 31, pct: 76, avatar: 'SM' },
 ];
 
-// ─── MINI CALENDAR COMPONENT ────────────────────────────────
 function MiniCalendar({ D }) {
   const today = new Date();
   const [cur, setCur] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -316,21 +311,20 @@ function Modal({ open, title, subtitle, onClose, onSubmit, loading, D, children 
     </div>
   );
 }
-
-// ─── MAIN ADMIN PANEL COMPONENT ─────────────────────────────
 export default function AdminPanel() {
-  // ── Authentication: Faqat admin bo'lishi mumkin ─────────────────────
-  const { isAuthenticated, user } = useRequireAuth('admin');
+  const { isAuthenticated, user, isLoading } = useRequireAuth('admin');
 
-  if (!isAuthenticated) {
+  // 1-to'siq: Yuklanayotgan bo'lsa yoki roli admin bo'lmasa, pastdagi kodga o'tkazma!
+  if (isLoading || !isAuthenticated || user?.role !== 'admin') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <p className="text-lg font-semibold text-gray-600">Yuklanmoqda...</p>
-        </div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f0f12' }}>
+        <RotateCw size={30} color="#427A43" style={{ animation: 'spin 1s linear infinite' }} />
+        <p style={{ color: '#fff', marginLeft: 10 }}>Ruxsat tekshirilmoqda...</p>
       </div>
     );
   }
+  
+  // Faqat shundan keyingina qolgan AdminPanel kodlari kelsin...
 
   const { isDarkMode: D }  = useTheme();
   const navigate           = useNavigate();

@@ -124,7 +124,7 @@ class ApiService {
       if (res?.accessToken) { this.setToken(res.accessToken); return this.request(endpoint, options); }
     } catch {
       this.clearToken();
-      window.location.href = "/login";
+      // window.location.href = "/login";
       throw new Error("Sessiya tugadi, iltimos qayta kiring.");
     }
   }
@@ -135,19 +135,76 @@ class ApiService {
     if (res?.accessToken) this.setToken(res.accessToken);
     return res;
   }
+  
+  // Universal login - backend role'ini aniqlaydi, biz role'ni yubormaymiz
   async login(data) {
-    const res = await this.request("/api/auth/login", { method: "POST", body: JSON.stringify(data) });
+    const res = await this.request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(data)
+    });
+
     if (res?.accessToken) this.setToken(res.accessToken);
     return res;
   }
+  
+  // Teacher login - aniq teacher role bilan
   async teacherLogin(data) {
-    const res = await this.request("/api/auth/login", { method: "POST", body: JSON.stringify(data) });
+    // Teacher login uchun role ni header va body ga qo'shamiz
+    const loginData = {
+      ...data,
+      role: 'teacher' // Backendga teacher ekanligini bildirish
+    };
+
+    const headers = {
+      "X-User-Role": "teacher"
+    };
+
+    const res = await this.request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(loginData),
+      headers: headers
+    });
+
     if (res?.accessToken) this.setToken(res.accessToken);
+
+    // Backenddan kelgan roleni tekshirish
+    console.log("Teacher login response:", res);
+
     return res;
   }
-async getProfile() { 
-  return this.request("/api/auth/me", { skipCache: true }); 
-}
+
+  // Student login - aniq student role bilan
+  async studentLogin(data) {
+    // Student login uchun role ni header va body ga qo'shamiz
+    const loginData = {
+      ...data,
+      role: 'student' // Backendga student ekanligini bildirish
+    };
+
+    const headers = {
+      "X-User-Role": "student"
+    };
+
+    const res = await this.request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify(loginData),
+      headers: headers
+    });
+
+    if (res?.accessToken) this.setToken(res.accessToken);
+
+    // Backenddan kelgan roleni tekshirish
+    console.log("Student login response:", res);
+
+    return res;
+  }
+  
+  async getProfile() { 
+    const response = await this.request("/api/auth/me", { skipCache: true });
+    console.log("GetProfile response:", response);
+    return response;
+  }
+  
   async updateProfile(data) { return this.request("/api/auth/me", { method: "PUT", body: JSON.stringify(data) }); }
   async refresh()           { return this.request("/api/auth/refresh", { method: "POST" }); }
   async logout() {
@@ -212,8 +269,6 @@ async getProfile() {
     return this.request(`/api/groups/${groupId}/students/${studentId}`, { method: "DELETE" });
   }
 
-  // ✅ TUZATILDI: endi /api/students?groupId=... ishlatadi
-  // API docs: GET /api/groups/:id faqat guruh ob'ektini qaytaradi, o'quvchilar emas
   async getGroupStudents(groupId) {
     return this.request(`/api/students?groupId=${groupId}`, { skipCache: true });
   }
@@ -265,7 +320,8 @@ async getProfile() {
   async getCourseReport(id)   { return this.request(`/api/reports/course/${id}`,   { skipCache: true }); }
   async getAttendanceReport() { return this.request("/api/reports/attendance",     { skipCache: true }); }
   async getPaymentsReport()   { return this.request("/api/reports/payments",       { skipCache: true }); }
-  async getLeaderboard()      { return this.request("/api/reports/leaderboard",    { skipCache: true }); }
+  // Leaderboard endpoint backendda yo'q, o'chirildi
+  // async getLeaderboard()      { return this.request("/api/reports/leaderboard",    { skipCache: true }); }
 
   // ── Payments ──────────────────────────────────────────────
   async getPayments()            { return this.request("/api/payments"); }

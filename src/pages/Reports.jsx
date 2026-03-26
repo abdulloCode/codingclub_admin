@@ -310,9 +310,7 @@ export default function Reports() {
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
                   <PieChart size={48} className="mx-auto mb-3 text-gray-400" />
-                  <p className="text-gray-600 dark:text-gray-400">
-                    O'quvchilar batafsil statistikasi uchun API endpoint tayyorlanmoqda...
-                  </p>
+                 
                 </div>
               </div>
             )}
