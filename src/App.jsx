@@ -219,6 +219,29 @@
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
+
+      /* Hide scrollbars on mobile */
+      @media (max-width: 1024px) {
+        *::-webkit-scrollbar {
+          display: none;
+        }
+        * {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      }
+
+      /* Mobile-first responsive styles */
+      @media (max-width: 768px) {
+        body {
+          font-size: 14px;
+        }
+      }
+      @media (max-width: 480px) {
+        body {
+          font-size: 13px;
+        }
+      }
       @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }

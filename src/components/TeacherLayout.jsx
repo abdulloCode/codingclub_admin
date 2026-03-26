@@ -157,7 +157,18 @@ export default function TeacherLayout() {
   return (
     <>
       <style>{`
-        .teacher-layout {}
+        .teacher-layout {
+          /* Mobile-first: no scrollbars, fit to screen */
+        }
+
+        /* Hide scrollbars for mobile */
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
 
         .nav-btn {
           padding: 12px 16px;
@@ -205,26 +216,162 @@ export default function TeacherLayout() {
           box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         }
 
-        ::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
+        /* Mobile Bottom Navigation */
+        .mobile-bottom-nav {
+          display: none;
         }
-        ::-webkit-scrollbar-track {
-          background: transparent;
+
+        @media (max-width: 1024px) {
+          .mobile-bottom-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: ${sbg};
+            border-top: 1px solid ${sbord};
+            padding: 8px 12px;
+            padding-bottom: env(safe-area-inset-bottom, 8px);
+            z-index: 1000;
+            box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+            gap: 4px;
+            justify-content: space-around;
+            align-items: center;
+            backdrop-filter: blur(10px);
+          }
+
+          .mobile-nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 4px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 0;
+            max-width: 100px;
+          }
+
+          .mobile-nav-item.active {
+            background: ${BRAND_PALE};
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
+          }
+
+          .mobile-nav-item:active {
+            transform: scale(0.95);
+          }
+
+          .mobile-nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+          }
+
+          .mobile-nav-item.active .mobile-nav-icon {
+            color: ${BRAND};
+            transform: scale(1.1);
+          }
+
+          .mobile-nav-item:not(.active) .mobile-nav-icon {
+            color: ${mu};
+          }
+
+          .mobile-nav-label {
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+          }
+
+          .mobile-nav-item.active .mobile-nav-label {
+            color: ${BRAND};
+            font-weight: 600;
+          }
+
+          .mobile-nav-item:not(.active) .mobile-nav-label {
+            color: ${mu};
+          }
+
+          /* Add padding to main content for bottom nav */
+          .teacher-main-content {
+            padding-bottom: 80px;
+          }
+
+          /* Hide desktop sidebar on mobile */
+          .desktop-sidebar {
+            display: none !important;
+          }
+
+          /* Mobile header adjustments */
+          .teacher-mobile-header {
+            display: flex !important;
+          }
         }
-        ::-webkit-scrollbar-thumb {
-          background: ${D ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'};
-          border-radius: 4px;
+
+        /* Tablet responsive */
+        @media (min-width: 768px) and (max-width: 1024px) {
+          .mobile-nav-label {
+            font-size: 11px;
+          }
+          .mobile-nav-icon {
+            width: 26px;
+            height: 26px;
+          }
         }
-        ::-webkit-scrollbar-thumb:hover {
-          background: ${D ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'};
+
+        /* Small mobile devices */
+        @media (max-width: 480px) {
+          .mobile-bottom-nav {
+            padding: 6px 8px;
+            gap: 2px;
+          }
+          .mobile-nav-item {
+            padding: 4px 2px;
+          }
+          .mobile-nav-icon {
+            width: 22px;
+            height: 22px;
+            margin-bottom: 2px;
+          }
+          .mobile-nav-label {
+            font-size: 9px;
+          }
+          .teacher-main-content {
+            padding-bottom: 75px;
+          }
+        }
+
+        /* Show scrollbar on desktop */
+        @media (min-width: 1025px) {
+          ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+          }
+          ::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          ::-webkit-scrollbar-thumb {
+            background: ${D ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'};
+            border-radius: 4px;
+          }
+          ::-webkit-scrollbar-thumb:hover {
+            background: ${D ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'};
+          }
         }
       `}</style>
 
       <div className="teacher-layout flex min-h-screen" style={{ background: bg }}>
 
         {/* ── TEACHER SIDEBAR ── */}
-        <aside className="hidden lg:flex flex-col w-64 h-screen sticky top-0 z-40 flex-shrink-0 p-4"
+        <aside className="desktop-sidebar hidden lg:flex flex-col w-64 h-screen sticky top-0 z-40 flex-shrink-0 p-4"
           style={{ background: sbg, borderRight: `1px solid ${sbord}` }}>
 
           {/* Logo */}
@@ -384,16 +531,16 @@ export default function TeacherLayout() {
         {/* ── MAIN CONTENT ── */}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Topbar */}
-          <header className="sticky top-0 z-30 px-6 h-16 flex items-center justify-between backdrop-blur-lg"
+          <header className="sticky top-0 z-30 px-4 md:px-6 h-16 flex items-center justify-between backdrop-blur-lg"
             style={{
               background: sbg,
               borderBottom: `1px solid ${sbord}`,
               backgroundOpacity: D ? '0.95' : '0.98'
             }}>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               <div style={{
-                width: '40px',
-                height: '40px',
+                width: '36px',
+                height: '36px',
                 borderRadius: '10px',
                 background: `linear-gradient(135deg, ${BRAND} 0%, ${BRAND_LIGHT} 100%)`,
                 display: 'flex',
@@ -401,18 +548,21 @@ export default function TeacherLayout() {
                 justifyContent: 'center',
                 boxShadow: `0 4px 12px ${BRAND}40`,
               }}>
-                <GraduationCap size={20} color="white" />
+                <GraduationCap size={18} color="white" />
               </div>
-              <div>
-                <p style={{ fontSize: '16px', fontWeight: 600, color: tx, lineHeight: 1 }}>O'qituvchi Paneli</p>
-                <p style={{ fontSize: '11px', color: mu, marginTop: '2px' }}>Boshqaruv Tizimi</p>
+              <div className="hidden sm:block">
+                <p style={{ fontSize: '15px', fontWeight: 600, color: tx, lineHeight: 1 }}>O'qituvchi Paneli</p>
+                <p style={{ fontSize: '10px', color: mu, marginTop: '2px' }}>Boshqaruv Tizimi</p>
+              </div>
+              <div className="sm:hidden">
+                <p style={{ fontSize: '14px', fontWeight: 600, color: tx, lineHeight: 1 }}>Panel</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', background: D ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)' }}>
+            <div className="flex items-center gap-2 md:gap-3">
+              <div style={{ display: 'none md:flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '8px', background: D ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)' }}>
                 <ServerStatus />
-                <span className="text-xs" style={{ color: mu }}>
+                <span className="text-xs hidden md:block" style={{ color: mu }}>
                   {new Date().toLocaleDateString('uz-UZ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </span>
               </div>
@@ -420,8 +570,8 @@ export default function TeacherLayout() {
               <button
                 onClick={() => navigate(location.pathname)}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '8px',
                   background: BRAND_PALE,
                   color: BRAND,
@@ -442,14 +592,14 @@ export default function TeacherLayout() {
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                <RotateCw size={16} />
+                <RotateCw size={14} />
               </button>
 
               <button
                 onClick={toggleDarkMode}
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '8px',
                   background: BRAND_PALE,
                   color: BRAND,
@@ -470,13 +620,13 @@ export default function TeacherLayout() {
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                {D ? <span className="text-lg">☀️</span> : <span className="text-lg">🌙</span>}
+                {D ? <span className="text-base">☀️</span> : <span className="text-base">🌙</span>}
               </button>
 
               <button
                 style={{
-                  width: '36px',
-                  height: '36px',
+                  width: '32px',
+                  height: '32px',
                   borderRadius: '8px',
                   background: BRAND_PALE,
                   color: BRAND,
@@ -498,17 +648,17 @@ export default function TeacherLayout() {
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
-                <Bell size={16} />
+                <Bell size={14} />
                 <span style={{
                   position: 'absolute',
-                  top: '-4px',
-                  right: '-4px',
-                  width: '16px',
-                  height: '16px',
+                  top: '-3px',
+                  right: '-3px',
+                  width: '14px',
+                  height: '14px',
                   background: '#ef4444',
                   borderRadius: '50%',
                   color: 'white',
-                  fontSize: '10px',
+                  fontSize: '9px',
                   fontWeight: 'bold',
                   display: 'flex',
                   alignItems: 'center',
@@ -522,17 +672,17 @@ export default function TeacherLayout() {
               <button
                 onClick={handleLogout}
                 style={{
-                  padding: '8px 16px',
+                  padding: '6px 12px',
                   borderRadius: '8px',
                   background: 'rgba(239,68,68,0.1)',
                   color: '#ef4444',
                   border: 'none',
                   cursor: 'pointer',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: 500,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '4px',
                   transition: 'all 0.2s',
                 }}
                 title="Chiqish"
@@ -543,14 +693,14 @@ export default function TeacherLayout() {
                   e.currentTarget.style.background = 'rgba(239,68,68,0.1)';
                 }}
               >
-                <LogOut size={14} />
-                Chiqish
+                <LogOut size={12} />
+                <span className="hidden md:inline">Chiqish</span>
               </button>
             </div>
           </header>
 
           {/* Page Content */}
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto teacher-main-content no-scrollbar">
             {location.pathname === '/teacher-panel' ? (
               // Teacher Dashboard
               <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto' }}>
@@ -926,6 +1076,24 @@ export default function TeacherLayout() {
               <Outlet />
             )}
           </main>
+
+          {/* Mobile Bottom Navigation - Only visible on mobile/tablet */}
+          <div className="mobile-bottom-nav">
+            {navLinks.map((link, index) => {
+              const Icon = link.icon;
+              const isActive = location.pathname.startsWith(link.path);
+              return (
+                <button
+                  key={index}
+                  onClick={() => navigate(link.path)}
+                  className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <Icon className="mobile-nav-icon" />
+                  <span className="mobile-nav-label">{link.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </>

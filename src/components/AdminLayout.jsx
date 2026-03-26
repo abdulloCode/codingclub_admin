@@ -65,6 +65,31 @@ const STYLES = `
   @media(max-width:1023px){
     .al-sidebar { display: none !important; }
     .al-mobile-nav { display: flex !important; }
+    .al-page::-webkit-scrollbar { display: none; }
+    .al-page { -ms-overflow-style: none; scrollbar-width: none; padding-bottom: 80px !important; }
+  }
+
+  /* Mobile bottom navigation */
+  .al-mobile-nav {
+    padding: 8px 12px;
+    padding-bottom: env(safe-area-inset-bottom, 8px);
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .al-mobile-item {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 4px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .al-mobile-item:active {
+    transform: scale(0.95);
+  }
+
+  .al-mobile-item.active {
+    background: rgba(66, 122, 67, 0.08);
   }
 `;
 
@@ -212,19 +237,19 @@ export default function AdminLayout() {
 
         {/* ── MOBILE NAV ──────────────────────────────────── */}
         <nav className="al-mobile-nav" style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, height: 70,
+          position: 'fixed', bottom: 0, left: 0, right: 0,
           background: side, borderTop: `1px solid ${bord}`,
-          display: 'none', justifyContent: 'space-around', alignItems: 'center', padding: '0 10px', zIndex: 100
+          display: 'none', justifyContent: 'space-around', alignItems: 'center', zIndex: 1000
         }}>
-          {NAV_LINKS.slice(0, 5).map((n, i) => {
+          {NAV_LINKS.map((n, i) => {
             const Icon = n.icon;
-            const isActive = location.pathname === n.path;
+            const isActive = location.pathname === n.path || (n.path !== '/admin-panel' && location.pathname.startsWith(n.path));
             return (
-              <button key={i} onClick={() => navigate(n.path)} style={{
-                background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: isActive ? B : mu
+              <button key={i} onClick={() => navigate(n.path)} className={`al-mobile-item ${isActive ? 'active' : ''}`} style={{
+                background: 'none', border: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: isActive ? B : mu, minWidth: 0, flex: 1
               }}>
-                <Icon size={22} />
-                <span style={{ fontSize: 10, fontWeight: 600 }}>{n.label.split(' ')[0]}</span>
+                <Icon size={18} />
+                <span style={{ fontSize: 8, fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{n.label.split(' ')[0]}</span>
               </button>
             );
           })}
