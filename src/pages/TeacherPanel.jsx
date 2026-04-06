@@ -4,790 +4,2127 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { apiService } from '../services/api';
 import {
-  FileText, CheckCircle, Plus, Trash2, RotateCw,
-  Calendar, BookOpen, Users, Layers, Clock,
-  Menu, X, Bell, Search, Settings,
-  Home, LogOut, ChevronDown, TrendingUp,
-  Award, Target, AlertTriangle, Play, Pause
+  LayoutDashboard,
+  FileText,
+  CheckCircle,
+  Plus,
+  Trash2,
+  RotateCw,
+  Calendar,
+  Users,
+  Layers,
+  Clock,
+  Menu,
+  X,
+  Bell,
+  LogOut,
+  ChevronRight,
+  GraduationCap,
+  Settings,
+  AlertCircle,
+  Send,
+  Star,
+  Search,
 } from 'lucide-react';
-
-const BRAND = '#6366f1';
-const BRAND_LIGHT = '#818cf8';
-const BRAND_DARK = '#4f46e5';
 
 export default function TeacherPanel() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { isDarkMode: D } = useTheme();
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
+
+  const [active, setActive] = useState("dashboard");
+  const [selHW, setSelHW] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [assignments, setAssignments] = useState([]);
+  const [homeworks, setHomeworks] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [attendanceStats, setAttendanceStats] = useState({
-    total: 0, present: 0, absent: 0, late: 0, rate: 0,
+  const [attStats, setAttStats] = useState({
+    total: 0,
+    present: 0,
+    absent: 0,
+    late: 0,
+    rate: 0,
   });
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  const sectionTabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'assignments', label: 'Topshiriqlar', icon: FileText },
-    { id: 'grading', label: 'Baholash', icon: CheckCircle },
-    { id: 'groups', label: 'Guruhlar', icon: Layers },
-  ];
-
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
-    title: '', description: '', groupId: '', dueDate: '', points: 100
+    title: "",
+    description: "",
+    groupId: "",
+    dueDate: "",
+    points: 100,
+    imageFile: null,
+    imagePreview: null,
   });
   const [modalLoading, setModalLoading] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [gradeInputs, setGradeInputs] = useState({});
+  const [search, setSearch] = useState("");
 
-  const loadAssignments = async () => {
+  // ── THEME ─────────────────────────────────────────────────
+  const C = {
+    bg: D ? "#0c0c0e" : "#f8f9fb",
+    sidebar: D ? "#111114" : "#ffffff",
+    card: D ? "#18181c" : "#ffffff",
+    card2: D ? "#1e1e24" : "#f4f4f6",
+    border: D ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)",
+    text: D ? "#f2f2f3" : "#111112",
+    muted: D ? "rgba(242,242,243,0.45)" : "rgba(17,17,18,0.45)",
+    blue: "#3b82f6",
+    green: "#22c55e",
+    amber: "#f59e0b",
+    red: "#ef4444",
+  };
+
+  // ── NAV ITEMS ─────────────────────────────────────────────
+  const NAV = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "attendance", label: "Davomat", icon: Calendar },
+    {
+      id: "homework",
+      label: "Uy vazifalari",
+      icon: FileText,
+      badge: homeworks.length || null,
+    },
+    {
+      id: "grading",
+      label: "Baholash",
+      icon: CheckCircle,
+      badge: submissions.filter((s) => !s.graded).length || null,
+    },
+    {
+      id: "groups",
+      label: "Guruhlar",
+      icon: Layers,
+      badge: groups.length || null,
+    },
+  ];
+
+  // ── LOADERS ───────────────────────────────────────────────
+  const loadHomeworks = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getHomeworks().catch(() => []);
-      const hw = Array.isArray(data) ? data : data?.homeworks || data?.data || [];
-      setAssignments(hw);
-    } catch (err) {
-      console.error('Yuklashda xatolik:', err);
-      setAssignments([]);
+      const d = await apiService.getHomeworks().catch(() => []);
+      setHomeworks(Array.isArray(d) ? d : d?.homeworks || d?.data || []);
+    } catch {
+      setHomeworks([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSubmissions = async (assignmentId) => {
+  const loadSubmissions = async (id) => {
     try {
-      const data = await apiService.getHomeworkSubmissions(assignmentId);
-      const subs = Array.isArray(data) ? data : data?.submissions || data?.data || [];
-      setSubmissions(subs);
-    } catch (err) {
-      console.error('Topshiriqlarni yuklashda xatolik:', err);
+      const d = await apiService.getHomeworkSubmissions(id);
+      setSubmissions(Array.isArray(d) ? d : d?.submissions || d?.data || []);
+    } catch {
+      setSubmissions([]);
     }
   };
 
   const loadGroups = async () => {
-    try {
-      const data = await apiService.getMyTeacherGroups();
-      let grps = [];
-      if (Array.isArray(data)) {
-        grps = data;
-      } else if (data?.groups && Array.isArray(data.groups)) {
-        grps = data.groups;
-      } else if (data?.data && Array.isArray(data.data)) {
-        grps = data.data;
-      }
-      const teacherId = user?.id || user?.userId;
-      if (teacherId) {
-        grps = grps.filter(group =>
-          group.teacherId === teacherId || group.teacher?.id === teacherId
-        );
-      }
-      setGroups(grps);
-    } catch (err) {
-      console.error('Guruhlarni yuklashda xatolik:', err);
-      setGroups([]);
-    }
-  };
+  try {
+    console.log("🔍 FETCH TEACHER GROUPS START");
+    
+    // Avval teacher profilini olish
+    const meData = await apiService.getMyTeacherData();
+    console.log("👤 Teacher data:", meData);
+    
+    const teacherId = meData?.teacher?.id || meData?.id;
+    console.log("🆔 Teacher profile ID:", teacherId);
+    
+    // Teacher profile id si bilan guruhlarni olish
+    const d = await apiService.getTeacherGroups(teacherId);
+    console.log("📋 Groups response:", d);
+    
+    const g = Array.isArray(d) ? d : d?.groups || d?.data || [];
+    setGroups(g);
+    console.log("✅ Groups loaded:", g.length);
+  } catch (err) {
+    console.error("❌ Error:", err);
+    setGroups([]);
+  }
+};
 
-  const loadTeacherAttendance = async () => {
+  const loadAtt = async (grps) => {
     try {
-      const allAttendance = [];
-      if (groups.length > 0) {
-        for (const group of groups) {
-          try {
-            const data = await apiService.getGroupAttendanceRecords(group.id);
-            const records = Array.isArray(data) ? data : data?.data || [];
-            allAttendance.push(...records);
-          } catch (err) {
-            console.log(`Guruh ${group.id} davomatini yuklashda xatolik:`, err);
-          }
+      const all = [];
+      for (const g of grps) {
+        try {
+          const d = await apiService.getGroupAttendanceRecords(g.id);
+          all.push(...(Array.isArray(d) ? d : d?.data || []));
+        } catch (err) {
+          console.error(`Error loading attendance for group ${g.id}:`, err);
         }
       }
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const todayAttendance = allAttendance.filter(r => r.date?.startsWith(todayStr));
-      const totalToday = todayAttendance.length;
-      const presentToday = todayAttendance.filter(r => r.status === 'present' || r.status === 'late').length;
-      const absentToday = todayAttendance.filter(r => r.status === 'absent').length;
-      const lateToday = todayAttendance.filter(r => r.status === 'late').length;
-      const rate = totalToday > 0 ? Math.round((presentToday / totalToday) * 100) : 0;
-      setAttendanceStats({ total: totalToday, present: presentToday, absent: absentToday, late: lateToday, rate });
+      const t = new Date();
+      const ts = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+      const tod = all.filter((r) => r.date?.startsWith(ts));
+      const present = tod.filter(
+        (r) => r.status === "present" || r.status === "late",
+      ).length;
+      const absent = tod.filter((r) => r.status === "absent").length;
+      const late = tod.filter((r) => r.status === "late").length;
+      setAttStats({
+        total: tod.length,
+        present,
+        absent,
+        late,
+        rate: tod.length ? Math.round((present / tod.length) * 100) : 0,
+      });
     } catch (err) {
-      console.error('Davomat statistikasini yuklashda xatolik:', err);
+      console.error("Error loading attendance:", err);
+      setAttStats({ total: 0, present: 0, absent: 0, late: 0, rate: 0 });
     }
   };
 
   useEffect(() => {
-    loadAssignments();
+    console.log("🚀 TEACHER PANEL MOUNTING");
+    console.log("🔍 LOADING INITIAL DATA: homeworks and groups");
+    loadHomeworks();
     loadGroups();
   }, []);
-
   useEffect(() => {
-    if (groups.length > 0) loadTeacherAttendance();
+    if (groups.length > 0) loadAtt(groups);
   }, [groups]);
 
-  const handleSubmit = async (e) => {
+  // ── ACTIONS ───────────────────────────────────────────────
+  const createHW = async (e) => {
     e.preventDefault();
     setModalLoading(true);
     try {
-      await apiService.createHomework(form);
-      alert('Topshiriq muvaffaqiyatli yaratildi!');
-      setShowCreateModal(false);
-      setForm({ title: '', description: '', groupId: '', dueDate: '', points: 100 });
-      loadAssignments();
+      let imageUrl = null;
+      if (form.imageFile) {
+        try {
+          const formData = new FormData();
+          formData.append("image", form.imageFile);
+          const uploadResponse = await fetch(
+            `${import.meta.env.VITE_API_URL || "https://blog-mrabdunozir-uz.onrender.com"}/api/upload`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+              },
+              body: formData,
+            },
+          );
+          if (!uploadResponse.ok) throw new Error("Rasm yuklashda xatolik");
+          const uploadData = await uploadResponse.json();
+          imageUrl = uploadData.url || uploadData.imageUrl;
+        } catch (err) {
+          console.error("Rasm yuklashda xatolik:", err);
+          alert("Rasm yuklashda xatolik. Vazifa rasmsiz yaratiladi.");
+        }
+      }
+      await apiService.createHomework({
+        ...form,
+        deadline: form.dueDate,
+        maxPoints: form.points,
+        imageUrl,
+      });
+      setShowModal(false);
+      setForm({
+        title: "",
+        description: "",
+        groupId: "",
+        dueDate: "",
+        points: 100,
+        imageFile: null,
+        imagePreview: null,
+      });
+      loadHomeworks();
     } catch (err) {
-      console.error('Yaratishda xatolik:', err);
-      alert('Xatolik yuz berdi!');
+      alert("Xatolik: " + err.message);
     } finally {
       setModalLoading(false);
     }
   };
 
-  const gradeSubmission = async (assignmentId, submissionId, points) => {
-    if (!points || points < 0 || points > 100) {
-      alert('Ballni 0 dan 100 gacha kiritishingiz kerak!');
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Rasm hajmi 5MB dan katta bo'lmasligi kerak!");
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      alert("Faqat rasm fayllari yuklash mumkin!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () =>
+      setForm({ ...form, imageFile: file, imagePreview: reader.result });
+    reader.readAsDataURL(file);
+  };
+
+  const deleteHW = async (id, e) => {
+    e.stopPropagation();
+    if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
+    try {
+      await apiService.deleteHomework(id);
+      loadHomeworks();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const grade = async (hwId, studentId, pts) => {
+    const p = parseInt(pts);
+    if (isNaN(p) || p < 0 || p > 100) {
+      alert("0–100 oraliqda ball kiriting");
       return;
     }
     try {
-      await apiService.gradeHomework(assignmentId, submissionId, parseInt(points));
-      alert('Muvaffaqiyatli baholandi!');
-      loadSubmissions(assignmentId);
+      // POST /api/homework/:id/grade → { studentId, points }
+      await apiService.gradeHomework(hwId, { studentId, points: p });
+      loadSubmissions(hwId);
     } catch (err) {
-      console.error('Baholashda xatolik:', err);
-      alert('Xatolik yuz berdi!');
+      alert(err.message);
     }
   };
-
-  const deleteAssignment = async (assignmentId) => {
-    if (!confirm("Ushbu topshiriqni o'chirmoqchimisiz?")) return;
-    try {
-      await apiService.deleteHomework(assignmentId);
-      alert("Topshiriq o'chirildi!");
-      loadAssignments();
-    } catch (err) {
-      console.error("O'chirishda xatolik:", err);
-    }
+  const goTo = (id) => {
+    setActive(id);
+    setMobileOpen(false);
   };
 
-  const bg     = D ? '#0a0a0f' : '#f8fafc';
-  const card   = D ? '#1e1e24' : '#ffffff';
-  const bord   = D ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
-  const tx     = D ? '#f1f5f9' : '#1e293b';
-  const mu     = D ? 'rgba(255,255,255,0.6)' : 'rgba(30,41,59,0.5)';
-  const bgItem = D ? '#1e1e24' : '#ffffff';
+  // ── HELPERS ───────────────────────────────────────────────
+  const totalStudents = groups.reduce(
+    (t, g) => t + (g.students?.length || g.currentStudents || 0),
+    0,
+  );
+  const pendingGrade = submissions.filter((s) => !s.graded).length;
+  const fmtDate = (d) =>
+    d
+      ? new Date(d).toLocaleDateString("uz-UZ", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—";
+
+  // ── STYLES ────────────────────────────────────────────────
+  const css = `
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:${C.border}; border-radius:4px; }
+
+    .tp-shell { display:flex; height:100vh; overflow:hidden; background:${C.bg}; font-family:'Geist',system-ui,sans-serif; color:${C.text}; }
+
+    /* sidebar */
+    .tp-sidebar {
+      width:240px; flex-shrink:0; height:100vh;
+      background:${C.sidebar}; border-right:1px solid ${C.border};
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+
+    /* main */
+    .tp-main { flex:1; min-width:0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    .tp-topbar {
+      height:56px; flex-shrink:0; background:${C.card};
+      border-bottom:1px solid ${C.border};
+      display:flex; align-items:center; justify-content:space-between; padding:0 20px;
+    }
+
+    .tp-body { flex:1; overflow-y:auto; padding:24px; }
+
+    /* nav */
+    .tp-nav-link {
+      display:flex; align-items:center; gap:9px;
+      padding:7px 10px; border-radius:6px;
+      font-size:13.5px; font-weight:500; color:${C.muted};
+      border:none; background:transparent; cursor:pointer; width:100%; text-align:left;
+      transition:background 150ms, color 150ms; position:relative;
+      font-family:'Geist',system-ui,sans-serif;
+    }
+    .tp-nav-link:hover { background:${D ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}; color:${C.text}; }
+    .tp-nav-link.active { background:${D ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}; color:${C.text}; font-weight:600; }
+    .tp-nav-badge { margin-left:auto; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:99px; background:${D ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)"}; color:${C.muted}; }
+    .tp-nav-section { font-size:11px; font-weight:600; color:${C.muted}; letter-spacing:.06em; text-transform:uppercase; padding:16px 10px 6px; }
+
+    /* cards */
+    .tp-card  { background:${C.card};  border:1px solid ${C.border}; border-radius:10px; }
+    .tp-card2 { background:${C.card2}; border:1px solid ${C.border}; border-radius:8px; }
+
+    /* stat box */
+    .tp-stat {
+      background:${C.card}; border:1px solid ${C.border}; border-radius:10px;
+      padding:18px 20px; display:flex; flex-direction:column; gap:8px;
+      transition:box-shadow 200ms, transform 200ms;
+    }
+    .tp-stat:hover { box-shadow:0 4px 20px rgba(0,0,0,.07); transform:translateY(-1px); }
+
+    /* table row */
+    .tp-row {
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      border-bottom:1px solid ${C.border}; transition:background 120ms;
+    }
+    .tp-row:last-child { border-bottom:none; }
+    .tp-row:hover { background:${D ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)"}; }
+
+    /* hw card */
+    .tp-hw-card {
+      background:${C.card}; border:1px solid ${C.border}; border-radius:10px;
+      padding:16px; cursor:pointer;
+      transition:box-shadow 180ms, border-color 180ms;
+    }
+    .tp-hw-card:hover { box-shadow:0 4px 24px rgba(0,0,0,.08); border-color:${D ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)"}; }
+
+    /* buttons */
+    .tp-btn { display:inline-flex; align-items:center; gap:6px; border:none; cursor:pointer; font-family:'Geist',system-ui,sans-serif; font-weight:500; transition:opacity 150ms, transform 120ms; }
+    .tp-btn:hover { opacity:.88; }
+    .tp-btn:active { transform:scale(.98); }
+    .tp-btn-default  { background:${D ? "#27272a" : "#18181b"}; color:#fff; padding:7px 14px; border-radius:7px; font-size:13px; }
+    .tp-btn-outline  { background:transparent; border:1px solid ${C.border}; color:${C.text}; padding:7px 14px; border-radius:7px; font-size:13px; }
+    .tp-btn-outline:hover { background:${D ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)"}; opacity:1; }
+    .tp-btn-ghost    { background:transparent; border:none; color:${C.muted}; padding:5px 8px; border-radius:6px; font-size:13px; }
+    .tp-btn-ghost:hover { background:${D ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)"}; color:${C.text}; opacity:1; }
+    .tp-btn-del      { background:rgba(239,68,68,.1); color:#ef4444; padding:5px 8px; border-radius:6px; font-size:13px; border:none; }
+    .tp-btn-del:hover { background:rgba(239,68,68,.18); opacity:1; }
+
+    /* input */
+    .tp-inp {
+      width:100%; background:${D ? "#1e1e24" : "#fafafa"};
+      border:1px solid ${C.border}; color:${C.text};
+      border-radius:7px; padding:8px 11px; font-size:13.5px;
+      font-family:'Geist',system-ui,sans-serif; outline:none;
+      transition:border-color 150ms, box-shadow 150ms;
+    }
+    .tp-inp:focus { border-color:${D ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.3)"}; box-shadow:0 0 0 3px ${D ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"}; }
+    .tp-inp::placeholder { color:${C.muted}; }
+    .tp-lbl { display:block; font-size:12px; font-weight:600; color:${C.text}; margin-bottom:6px; }
+
+    /* badges */
+    .tp-badge       { display:inline-flex; align-items:center; padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600; }
+    .tp-badge-blue  { background:rgba(59,130,246,.12);  color:#2563eb; }
+    .tp-badge-gray  { background:${D ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}; color:${C.muted}; }
+    .tp-badge-green { background:rgba(34,197,94,.12);   color:#16a34a; }
+    .tp-badge-red   { background:rgba(239,68,68,.12);   color:#dc2626; }
+    .tp-badge-amber { background:rgba(245,158,11,.12);  color:#d97706; }
+
+    /* misc */
+    .tp-avatar   { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0; }
+    .tp-divider  { height:1px; background:${C.border}; margin:0; }
+    .tp-prog-t   { background:${D ? "#27272a" : "#e4e4e7"}; border-radius:99px; overflow:hidden; }
+    .tp-prog-f   { height:100%; background:${C.text}; transition:width .4s ease; border-radius:99px; }
+
+    /* overlay / drawer */
+    .tp-overlay  { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(3px); z-index:50; }
+    .tp-drawer   { position:fixed; top:0; left:0; bottom:0; width:240px; background:${C.sidebar}; border-right:1px solid ${C.border}; z-index:51; display:flex; flex-direction:column; }
+
+    /* modal */
+    .tp-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; }
+
+    /* empty */
+    .tp-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:56px 20px; gap:12px; text-align:center; }
+    .tp-empty-icon { width:48px; height:48px; border-radius:12px; background:${C.card2}; display:flex; align-items:center; justify-content:center; }
+
+    /* animations */
+    @keyframes tp-fade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes tp-spin  { to{transform:rotate(360deg)} }
+    @keyframes tp-modal { from{opacity:0;transform:scale(.97) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+    .tp-enter { animation:tp-fade .25s ease both; }
+    .tp-spin  { animation:tp-spin 1s linear infinite; }
+    .tp-modal-enter { animation:tp-modal .2s ease both; }
+
+    /* mobile */
+    @media(max-width:768px) {
+      .tp-sidebar { display:none; }
+      .tp-body { padding:16px; }
+      .tp-ham { display:flex !important; }
+      .tp-stat-grid { grid-template-columns:1fr 1fr !important; }
+    }
+    .tp-ham { display:none; background:transparent; border:none; color:${C.muted}; cursor:pointer; padding:4px; align-items:center; }
+  `;
+
+  // ── SIDEBAR ───────────────────────────────────────────────
+  const SidebarInner = () => (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* brand */}
+      <div
+        style={{ padding: "16px 14px", borderBottom: `1px solid ${C.border}` }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 7,
+              background: "#427A43",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <GraduationCap size={16} color="#fff" />
+          </div>
+          <div>
+            <p
+              style={{
+                fontSize: 13.5,
+                fontWeight: 700,
+                color: C.text,
+                lineHeight: 1.2,
+              }}
+            >
+              CodingClub
+            </p>
+            <p style={{ fontSize: 11, color: C.muted }}>O'qituvchi Paneli</p>
+          </div>
+        </div>
+      </div>
+
+      {/* user */}
+      <div
+        style={{ padding: "12px 14px", borderBottom: `1px solid ${C.border}` }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 9,
+            padding: "8px 10px",
+            borderRadius: 7,
+            background: D ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+          }}
+        >
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              background: D ? "#27272a" : "#f4f4f5",
+              border: `1px solid ${C.border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 11,
+              fontWeight: 700,
+              color: C.text,
+              flexShrink: 0,
+            }}
+          >
+            {(user?.name || "T")[0].toUpperCase()}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: C.text,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {user?.name || "O'qituvchi"}
+            </p>
+            <p
+              style={{
+                fontSize: 11,
+                color: C.muted,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {user?.email || "teacher"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* nav */}
+      <nav
+        style={{
+          flex: 1,
+          padding: "8px 10px",
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+        }}
+      >
+        <p className="tp-nav-section">Menyu</p>
+        {NAV.map(({ id, label, icon: Icon, badge }) => (
+          <button
+            key={id}
+            onClick={() => goTo(id)}
+            className={`tp-nav-link ${active === id ? "active" : ""}`}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={16} />
+            </span>
+            <span style={{ flex: 1 }}>{label}</span>
+            {badge ? <span className="tp-nav-badge">{badge}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      {/* bottom */}
+      <div style={{ padding: "10px", borderTop: `1px solid ${C.border}` }}>
+        <button className="tp-nav-link">
+          <span
+            style={{
+              width: 18,
+              height: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <Settings size={15} />
+          </span>
+          <span style={{ flex: 1 }}>Sozlamalar</span>
+        </button>
+        <button
+          className="tp-nav-link"
+          style={{ color: "#ef4444" }}
+          onClick={async () => {
+            if (window.confirm("Tizimdan chiqmoqchimisiz?")) {
+              try {
+                await logout();
+                navigate("/login");
+              } catch (err) {
+                console.error("Chiqishda xatolik:", err);
+                // Xatolik bo'lsa ham login sahifaga yuborish
+                localStorage.removeItem("accessToken");
+                navigate("/login");
+              }
+            }
+          }}
+        >
+          <span
+            style={{
+              width: 18,
+              height: 18,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <LogOut size={15} />
+          </span>
+          <span style={{ flex: 1 }}>Chiqish</span>
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
-        body { background: ${bg}; color: ${tx}; }
-        .scroll-hide::-webkit-scrollbar { display: none; }
-        .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .smooth-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-fade { animation: fadeIn 0.3s ease-out forwards; }
-        .animate-slide { animation: slideIn 0.3s ease-out forwards; }
-        .card-hover { transition: all 0.2s cubic-bezier(0.4,0,0.2,1); }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 40px rgba(99,102,241,0.15); }
-        .btn-primary { background: linear-gradient(135deg,${BRAND},${BRAND_LIGHT}); transition: all 0.2s ease; }
-        .btn-primary:hover { background: linear-gradient(135deg,${BRAND_LIGHT},${BRAND_DARK}); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.3); }
-        .btn-secondary { background: transparent; border: 1px solid ${bord}; color: ${tx}; transition: all 0.2s ease; }
-        .btn-secondary:hover { background: ${D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)'}; }
-        .input-field { background: ${D ? '#2a2a35' : '#f8fafc'}; border: 1px solid ${bord}; color: ${tx}; transition: all 0.2s ease; }
-        .input-field:focus { border-color: ${BRAND}; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); outline: none; }
-        .sidebar-item { transition: all 0.2s ease; border-left: 3px solid transparent; }
-        .sidebar-item:hover { background: ${D ? 'rgba(255,255,255,0.05)' : 'rgba(99,102,241,0.05)'}; border-left-color: ${BRAND}; }
-        .sidebar-item.active { background: linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.05)); border-left-color: ${BRAND}; }
-        .nav-btn { transition: all 0.2s ease; }
-        .nav-btn:hover { background: ${D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)'}; }
-        .progress-bar { background: ${D ? '#374151' : '#e2e8f0'}; border-radius: 9999px; overflow: hidden; }
-        .progress-fill { background: linear-gradient(90deg,${BRAND},${BRAND_LIGHT}); height: 100%; transition: width 0.5s ease; }
-        @media (max-width: 768px) { .desktop-only { display: none !important; } }
-        @media (min-width: 769px) { .mobile-only { display: none !important; } }
-      `}</style>
+      <style>{css}</style>
 
-      <div style={{ display: 'flex', minHeight: '100vh', background: bg }}>
+      <div className="tp-shell">
+        {/* sidebar */}
+        <aside className="tp-sidebar">
+          <SidebarInner />
+        </aside>
 
-        {/* ── SIDEBAR ── */}
-        <div
-          className="desktop-only"
-          style={{
-            width: sidebarOpen ? '280px' : '80px',
-            background: card,
-            borderRight: `1px solid ${bord}`,
-            transition: 'width 0.3s ease',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'fixed',
-            left: 0, top: 0, bottom: 0,
-            zIndex: 40,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Logo */}
-          <div style={{ padding: '24px', borderBottom: `1px solid ${bord}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0,
-              background: `linear-gradient(135deg,${BRAND},${BRAND_LIGHT})`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Users size={20} color="white" />
+        {/* mobile overlay */}
+        {mobileOpen && (
+          <>
+            <div className="tp-overlay" onClick={() => setMobileOpen(false)} />
+            <div className="tp-drawer">
+              <SidebarInner />
             </div>
-            {sidebarOpen && (
-              <div>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: tx, margin: 0 }}>O'qituvchi</h2>
-                <p style={{ fontSize: '11px', color: mu, margin: '4px 0 0 0' }}>{user?.name || "O'qituvchi"}</p>
-              </div>
-            )}
-          </div>
+          </>
+        )}
 
-          {/* Toggle button */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              padding: '12px', background: 'none', border: 'none', color: mu, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderBottom: `1px solid ${bord}`,
-            }}
-          >
-            {sidebarOpen ? <ChevronDown size={20} /> : <Menu size={20} />}
-          </button>
-
-          {/* Nav */}
-          <nav style={{ flex: 1, padding: '16px 12px', overflowY: 'auto' }}>
-            {sectionTabs.map((section) => {
-              const Icon = section.icon;
-              const isActive = activeSection === section.id;
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => setActiveSection(section.id)}
-                  className={`sidebar-item ${isActive ? 'active' : ''}`}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-                    padding: '14px 16px', borderRadius: '10px', marginBottom: '4px',
-                    cursor: 'pointer', border: 'none', background: 'transparent',
-                    color: tx, fontSize: '14px', fontWeight: isActive ? 600 : 500,
-                  }}
-                >
-                  <Icon size={18} />
-                  {sidebarOpen && <span style={{ flex: 1, textAlign: 'left' }}>{section.label}</span>}
-                  {sidebarOpen && isActive && <ChevronDown size={16} style={{ color: BRAND }} />}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Logout */}
-          {sidebarOpen && (
-            <div style={{ padding: '16px', borderTop: `1px solid ${bord}` }}>
-              <button
-                onClick={() => { localStorage.removeItem('accessToken'); navigate('/teacher-login'); }}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '12px', borderRadius: '10px', border: 'none',
-                  background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)',
-                  color: D ? '#fca5a5' : '#ef4444', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: 500,
-                }}
-              >
-                <LogOut size={16} />
-                Chiqish
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* ── MAIN CONTENT ── */}
-        <div style={{
-          flex: 1,
-          marginLeft: sidebarOpen ? '280px' : '80px',
-          background: bg,
-          transition: 'margin-left 0.3s ease',
-          minHeight: '100vh',
-        }}>
-
-          {/* TOP NAVBAR */}
-          <div style={{
-            position: 'sticky', top: 0, background: card,
-            borderBottom: `1px solid ${bord}`, padding: '16px 24px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            zIndex: 30,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="desktop-only nav-btn"
-                style={{
-                  padding: '8px', borderRadius: '8px',
-                  background: D ? 'rgba(255,255,255,0.1)' : 'rgba(99,102,241,0.1)',
-                  border: 'none', color: tx, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
+        {/* main */}
+        <div className="tp-main">
+          {/* topbar */}
+          <header className="tp-topbar">
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <button className="tp-ham" onClick={() => setMobileOpen(true)}>
                 <Menu size={20} />
               </button>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: tx, margin: 0, letterSpacing: '-0.02em' }}>
-                {activeSection === 'dashboard' && 'Dashboard'}
-                {activeSection === 'assignments' && 'Topshiriqlar'}
-                {activeSection === 'grading' && 'Baholash'}
-                {activeSection === 'groups' && 'Guruhlar'}
+              <h1 style={{ fontSize: 15, fontWeight: 600, color: C.text }}>
+                {NAV.find((n) => n.id === active)?.label}
               </h1>
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <button style={{ padding: '8px', borderRadius: '8px', background: 'transparent', border: 'none', color: mu, cursor: 'pointer', position: 'relative' }}>
-                <Bell size={18} />
-                <span style={{
-                  position: 'absolute', top: '-2px', right: '-2px',
-                  width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%',
-                }} />
-              </button>
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="mobile-only nav-btn"
-                style={{ padding: '8px', borderRadius: '8px', background: 'transparent', border: 'none', color: tx, cursor: 'pointer' }}
-              >
-                <Menu size={20} />
-              </button>
-            </div>
-          </div>
-
-          {/* MOBILE MENU */}
-          {mobileMenuOpen && (
-            <div style={{
-              position: 'fixed', top: 0, left: 0, right: 0,
-              background: card, borderBottom: `1px solid ${bord}`,
-              padding: '16px', zIndex: 50, boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: tx }}>Menu</h2>
-                <button onClick={() => setMobileMenuOpen(false)} style={{ padding: '8px', background: 'transparent', border: 'none', color: mu, cursor: 'pointer' }}>
-                  <X size={24} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {active === "homework" && (
+                <button
+                  className="tp-btn tp-btn-default"
+                  onClick={() => setShowModal(true)}
+                  style={{ padding: "6px 12px", fontSize: 12.5 }}
+                >
+                  <Plus size={14} /> Yangi uy vazifasi
                 </button>
-              </div>
-              <div style={{ display: 'grid', gap: '8px' }}>
-                {sectionTabs.map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => { setActiveSection(section.id); setMobileMenuOpen(false); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '12px',
-                        padding: '16px 20px', borderRadius: '10px', border: 'none',
-                        background: isActive ? `linear-gradient(135deg,${BRAND},${BRAND_LIGHT})` : 'transparent',
-                        color: isActive ? 'white' : tx, cursor: 'pointer',
-                        fontSize: '14px', fontWeight: 500,
-                      }}
-                    >
-                      <Icon size={18} />
-                      {section.label}
-                    </button>
-                  );
-                })}
-              </div>
+              )}
               <button
-                onClick={() => { localStorage.removeItem('accessToken'); navigate('/teacher-login'); }}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '14px', borderRadius: '10px', border: 'none', marginTop: '12px',
-                  background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)',
-                  color: D ? '#fca5a5' : '#ef4444', cursor: 'pointer',
-                  fontSize: '13px', fontWeight: 500,
+                  position: "relative",
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  color: C.muted,
+                  cursor: "pointer",
+                  padding: "6px",
+                  borderRadius: 7,
+                  display: "flex",
+                  alignItems: "center",
                 }}
               >
-                <LogOut size={16} />
-                Chiqish
+                <Bell size={15} />
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 3,
+                    right: 3,
+                    width: 6,
+                    height: 6,
+                    background: "#ef4444",
+                    borderRadius: "50%",
+                  }}
+                />
               </button>
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  background: D ? "#27272a" : "#f4f4f5",
+                  border: `1px solid ${C.border}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: C.text,
+                  cursor: "pointer",
+                }}
+              >
+                {(user?.name || "T")[0].toUpperCase()}
+              </div>
             </div>
-          )}
+          </header>
 
-          {/* CONTENT AREA */}
-          <div style={{ padding: '24px' }}>
+          {/* page body */}
+          <div className="tp-body">
             {loading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-                <RotateCw size={40} color={BRAND} style={{ animation: 'spin 1s linear infinite' }} />
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  minHeight: "50vh",
+                }}
+              >
+                <RotateCw size={28} color={C.muted} className="tp-spin" />
               </div>
             ) : (
               <>
-                {/* ── DASHBOARD ── */}
-                {activeSection === 'dashboard' && (
-                  <div className="animate-fade">
-                    {/* Attendance */}
-                    <div style={{ background: card, borderRadius: '16px', padding: '24px', border: `1px solid ${bord}`, marginBottom: '24px' }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: 700, color: tx, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Calendar size={20} color={BRAND} />
-                        Bugungi Davomat
-                      </h2>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(120px,1fr))', gap: '16px', marginBottom: '20px' }}>
-                        {[
-                          { label: 'Keldi',   value: attendanceStats.present, color: '#22c55e', icon: CheckCircle },
-                          { label: 'Kelmadi', value: attendanceStats.absent,  color: '#ef4444', icon: X         },
-                          { label: 'Kechikdi',value: attendanceStats.late,    color: '#f59e0b', icon: Clock      },
-                          { label: 'Jami',    value: attendanceStats.total,   color: BRAND,     icon: Users      },
-                        ].map(({ label, value, color, icon: Icon }) => (
-                          <div key={label} style={{ padding: '20px', borderRadius: '12px', background: `${color}15`, border: `1px solid ${color}30`, textAlign: 'center' }}>
-                            <Icon size={28} style={{ color, marginBottom: '12px' }} />
-                            <p style={{ fontSize: '32px', fontWeight: 700, color, margin: 0 }}>{value}</p>
-                            <p style={{ fontSize: '12px', fontWeight: 500, color: mu, margin: '4px 0 0 0' }}>{label}</p>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '16px', borderTop: `1px solid ${bord}` }}>
-                        <div>
-                          <p style={{ fontSize: '14px', fontWeight: 500, color: mu }}>Davomat foizi</p>
-                          <p style={{ fontSize: '28px', fontWeight: 700, color: tx, margin: '4px 0 0 0' }}>{attendanceStats.rate}%</p>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <TrendingUp size={20} color={BRAND} />
-                          <span style={{ fontSize: '13px', color: mu }}>
-                            {attendanceStats.rate >= 80 ? "A'lo" : attendanceStats.rate >= 60 ? 'Yaxshi' : 'Yaxshilanadi'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))', gap: '16px' }}>
-                
-                      <div style={{ background: card, borderRadius: '16px', padding: '20px', border: `1px solid ${bord}` }} className="card-hover">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Users size={20} color={BRAND} />
-                          </div>
-                          <div>
-                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Jami o'quvchilar</p>
-                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>
-                              {groups.reduce((t, g) => t + (g.students?.length || g.currentStudents || 0), 0)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Active groups */}
-                      <div style={{ background: card, borderRadius: '16px', padding: '20px', border: `1px solid ${bord}` }} className="card-hover">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(34,197,94,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Layers size={20} color="#22c55e" />
-                          </div>
-                          <div>
-                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Faol guruhlar</p>
-                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>{groups.filter(g => g.status === 'active').length}</p>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Pending grading */}
-                      <div style={{ background: card, borderRadius: '16px', padding: '20px', border: `1px solid ${bord}` }} className="card-hover">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CheckCircle size={20} color="#f59e0b" />
-                          </div>
-                          <div>
-                            <p style={{ fontSize: '13px', fontWeight: 500, color: mu }}>Baholash kutilmoqda</p>
-                            <p style={{ fontSize: '24px', fontWeight: 700, color: tx }}>{submissions.filter(s => !s.graded).length}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ── ASSIGNMENTS ── */}
-                {activeSection === 'assignments' && (
-                  <div className="animate-fade">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                      <h2 style={{ fontSize: '20px', fontWeight: 700, color: tx }}>Mening Topshiriqlarim</h2>
-                      <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="btn-primary"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', borderRadius: '10px', color: 'white', fontWeight: 600, fontSize: '14px', border: 'none', cursor: 'pointer' }}
+                {/* ══ DASHBOARD ══════════════════════════════ */}
+                {active === "dashboard" && (
+                  <div
+                    className="tp-enter"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    <div>
+                      <h2
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 700,
+                          color: C.text,
+                          letterSpacing: "-.02em",
+                        }}
                       >
-                        <Plus size={16} />
-                        Yaratish
-                      </button>
+                        Salom, {user?.name?.split(" ")[0] || "O'qituvchi"} 👋
+                      </h2>
+                      <p
+                        style={{ fontSize: 13.5, color: C.muted, marginTop: 4 }}
+                      >
+                        {new Date().toLocaleDateString("uz-UZ", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </p>
                     </div>
 
-                    {assignments.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '60px 20px', background: card, borderRadius: '16px', border: `1px solid ${bord}` }}>
-                        <FileText size={48} color={mu} style={{ marginBottom: '16px' }} />
-                        <p style={{ fontSize: '18px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Hozircha topshiriqlar yo'q</p>
-                        <p style={{ fontSize: '14px', color: mu }}>Yangi topshiriq yaratish uchun "Yaratish" tugmasini bosing</p>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '16px' }}>
-                        {assignments.map((assignment) => (
+                    {/* stat cards */}
+                    <div
+                      className="tp-stat-grid"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(4,1fr)",
+                        gap: 12,
+                      }}
+                    >
+                      {[
+                        {
+                          label: "O'quvchilar",
+                          value: totalStudents,
+                          sub: "Jami",
+                          icon: Users,
+                          color: C.blue,
+                        },
+                        {
+                          label: "Guruhlar",
+                          value: groups.length,
+                          sub: "Jami",
+                          icon: Layers,
+                          color: C.green,
+                        },
+                        {
+                          label: "Uy vazifalari",
+                          value: homeworks.length,
+                          sub: "Jami",
+                          icon: FileText,
+                          color: C.amber,
+                        },
+                        {
+                          label: "Baholash",
+                          value: pendingGrade,
+                          sub: "Kutilmoqda",
+                          icon: AlertCircle,
+                          color: C.red,
+                        },
+                      ].map(({ label, value, sub, icon: Icon, color }) => (
+                        <div key={label} className="tp-stat">
                           <div
-                            key={assignment.id}
-                            style={{ background: bgItem, borderRadius: '16px', padding: '20px', border: `1px solid ${bord}`, cursor: 'pointer' }}
-                            className="card-hover"
-                            onClick={() => {
-                              setSelectedAssignment(assignment);
-                              loadSubmissions(assignment.id);
-                              setActiveSection('grading');
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
                             }}
                           >
-                            {/* Title row */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                              <h3 style={{ fontSize: '16px', fontWeight: 600, color: tx, margin: 0, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, marginRight: '8px' }}>
-                                {assignment.title}
-                              </h3>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); deleteAssignment(assignment.id); }}
-                                style={{ padding: '6px', borderRadius: '6px', background: D ? 'rgba(239,68,68,0.1)' : 'rgba(220,38,38,0.1)', border: 'none', color: D ? '#fca5a5' : '#ef4444', cursor: 'pointer', flexShrink: 0 }}
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                            <span
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 500,
+                                color: C.muted,
+                              }}
+                            >
+                              {label}
+                            </span>
+                            <div
+                              style={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: 6,
+                                background: `${color}18`,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <Icon size={14} color={color} />
                             </div>
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 28,
+                              fontWeight: 700,
+                              color: C.text,
+                              lineHeight: 1,
+                              letterSpacing: "-.02em",
+                            }}
+                          >
+                            {value}
+                          </p>
+                          <span style={{ fontSize: 11.5, color: C.muted }}>
+                            {sub}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
-                            {/* Meta */}
-                            <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Calendar size={14} color={mu} />
-                                <span style={{ fontSize: '12px', color: mu }}>{assignment.dueDate || 'Belgilanmagan'}</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <BookOpen size={14} color={mu} />
-                                <span style={{ fontSize: '12px', color: mu }}>{assignment.points || 100} ball</span>
-                              </div>
+                    {/* two-col */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: 16,
+                      }}
+                    >
+                      {/* recent homework */}
+                      <div className="tp-card" style={{ overflow: "hidden" }}>
+                        <div
+                          style={{
+                            padding: "14px 16px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: `1px solid ${C.border}`,
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            So'nggi uy vazifalari
+                          </p>
+                          <button
+                            className="tp-btn tp-btn-ghost"
+                            style={{ fontSize: 12 }}
+                            onClick={() => goTo("homework")}
+                          >
+                            Barchasini →
+                          </button>
+                        </div>
+                        {homeworks.length === 0 ? (
+                          <div className="tp-empty">
+                            <div className="tp-empty-icon">
+                              <FileText size={20} color={C.muted} />
                             </div>
-
-                            {/* Divider */}
-                            <div style={{ height: '3px', background: '#e5e7eb', borderRadius: '4px', marginBottom: '12px' }} />
-
-                            {/* Description */}
-                            <p style={{
-                              fontSize: '13px', color: mu, lineHeight: 1.5,
-                              display: '-webkit-box', WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                            }}>
-                              {assignment.description || "Tavsif yo'q"}
+                            <p style={{ fontSize: 13, color: C.muted }}>
+                              Hozircha uy vazifalari yo'q
                             </p>
+                          </div>
+                        ) : (
+                          homeworks.slice(0, 5).map((hw) => (
+                            <div
+                              key={hw.id}
+                              className="tp-row"
+                              style={{ cursor: "pointer" }}
+                              onClick={() => {
+                                setSelHW(hw);
+                                loadSubmissions(hw.id);
+                                goTo("grading");
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 7,
+                                  background: `${C.blue}15`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <FileText size={14} color={C.blue} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    color: C.text,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {hw.title}
+                                </p>
+                                <p
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: C.muted,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {hw.maxPoints || hw.points || 100} ball ·{" "}
+                                  {fmtDate(hw.deadline || hw.dueDate)}
+                                </p>
+                              </div>
+                              <ChevronRight size={14} color={C.muted} />
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* groups */}
+                      <div className="tp-card" style={{ overflow: "hidden" }}>
+                        <div
+                          style={{
+                            padding: "14px 16px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            borderBottom: `1px solid ${C.border}`,
+                          }}
+                        >
+                          <p
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Guruhlar
+                          </p>
+                          <button
+                            className="tp-btn tp-btn-ghost"
+                            style={{ fontSize: 12 }}
+                            onClick={() => goTo("groups")}
+                          >
+                            Barchasini →
+                          </button>
+                        </div>
+                        {groups.length === 0 ? (
+                          <div
+                            className="tp-empty"
+                            style={{ padding: "40px 20px" }}
+                          >
+                            <div className="tp-empty-icon">
+                              <Layers size={20} color={C.muted} />
+                            </div>
+                            <p
+                              style={{
+                                fontSize: 15,
+                                fontWeight: 600,
+                                color: C.text,
+                                marginTop: 12,
+                              }}
+                            >
+                              Sizga guruh tayinlanmagan
+                            </p>
+                            <p
+                              style={{
+                                fontSize: 13,
+                                color: C.muted,
+                                marginTop: 4,
+                              }}
+                            >
+                              Admin panelidan guruh biriktiring
+                            </p>
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    "Admin paneliga o'tmoqchimisiz?",
+                                  )
+                                ) {
+                                  window.open("/admin", "_blank");
+                                }
+                              }}
+                              style={{
+                                marginTop: 16,
+                                padding: "10px 16px",
+                                borderRadius: 8,
+                                background: `linear-gradient(135deg,${C.blue},#2563eb)`,
+                                border: "none",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#fff",
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                transition: "all 0.2s",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform =
+                                  "translateY(-2px)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform =
+                                  "translateY(0)";
+                              }}
+                            >
+                              <Users size={14} /> Admin paneliga o'tish
+                            </button>
+                          </div>
+                        ) : (
+                          groups.slice(0, 5).map((g) => (
+                            <div key={g.id} className="tp-row">
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 7,
+                                  background: D ? "#27272a" : "#f4f4f5",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: C.text,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {g.name?.substring(0, 2)?.toUpperCase() || "GR"}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    color: C.text,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {g.name}
+                                </p>
+                                <p
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: C.muted,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {g.currentStudents || 0}/{g.maxStudents || 20}{" "}
+                                  o'quvchi
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ══ ATTENDANCE ════════════════════════════ */}
+                {active === "attendance" && (
+                  <div
+                    className="tp-enter"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    {groups.length === 0 ? (
+                      <div
+                        style={{
+                          padding: "20px",
+                          textAlign: "center",
+                        }}
+                      >
+                        <p style={{ fontSize: 14, color: C.muted }}>
+                          Guruhlar topilmadi. Admin panelidan guruh yarating.
+                        </p>
+                        <p style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+                          API: /api/teachers/me/groups | Status: {groups.length} ta guruh
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <h2
+                          style={{
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: C.text,
+                            letterSpacing: "-.02em",
+                          }}
+                        >
+                          Davomat
+                        </h2>
+                        <p
+                          style={{ fontSize: 13, color: C.muted, marginTop: 3 }}
+                        >
+                          Bugungi davomat holati
+                        </p>
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit,minmax(150px,1fr))",
+                        gap: 12,
+                      }}
+                    >
+                      {[
+                        {
+                          label: "Keldi",
+                          value: attStats.present,
+                          color: C.green,
+                          icon: CheckCircle,
+                        },
+                        {
+                          label: "Kelmadi",
+                          value: attStats.absent,
+                          color: C.red,
+                          icon: X,
+                        },
+                        {
+                          label: "Kechikdi",
+                          value: attStats.late,
+                          color: C.amber,
+                          icon: Clock,
+                        },
+                        {
+                          label: "Jami",
+                          value: attStats.total,
+                          color: C.blue,
+                          icon: Users,
+                        },
+                      ].map(({ label, value, color, icon: Icon }) => (
+                        <div
+                          key={label}
+                          className="tp-stat"
+                          style={{ alignItems: "flex-start" }}
+                        >
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 7,
+                              background: `${color}15`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Icon size={15} color={color} />
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 30,
+                              fontWeight: 700,
+                              color: C.text,
+                              lineHeight: 1,
+                              letterSpacing: "-.02em",
+                            }}
+                          >
+                            {value}
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 12.5,
+                              color: C.muted,
+                              fontWeight: 500,
+                            }}
+                          >
+                            {label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="tp-card" style={{ padding: "20px 22px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div>
+                          <p
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Davomat foizi
+                          </p>
+                          <p
+                            style={{
+                              fontSize: 11.5,
+                              color: C.muted,
+                              marginTop: 2,
+                            }}
+                          >
+                            Bugun barcha guruhlar bo'yicha
+                          </p>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: 28,
+                            fontWeight: 800,
+                            color: C.text,
+                            letterSpacing: "-.03em",
+                          }}
+                        >
+                          {attStats.rate}%
+                        </span>
+                      </div>
+                      <div className="tp-prog-t" style={{ height: 8 }}>
+                        <div
+                          className="tp-prog-f"
+                          style={{ width: `${attStats.rate}%` }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 14,
+                          display: "flex",
+                          gap: 16,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {[
+                          {
+                            label: "Keldi",
+                            pct: attStats.total
+                              ? Math.round(
+                                  (attStats.present / attStats.total) * 100,
+                                )
+                              : 0,
+                            color: C.green,
+                          },
+                          {
+                            label: "Kelmadi",
+                            pct: attStats.total
+                              ? Math.round(
+                                  (attStats.absent / attStats.total) * 100,
+                                )
+                              : 0,
+                            color: C.red,
+                          },
+                          {
+                            label: "Kechikdi",
+                            pct: attStats.total
+                              ? Math.round(
+                                  (attStats.late / attStats.total) * 100,
+                                )
+                              : 0,
+                            color: C.amber,
+                          },
+                        ].map(({ label, pct, color }) => (
+                          <div
+                            key={label}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "50%",
+                                background: color,
+                                display: "inline-block",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontSize: 12.5, color: C.muted }}>
+                              {label}:{" "}
+                              <strong
+                                style={{ color: C.text, fontWeight: 600 }}
+                              >
+                                {pct}%
+                              </strong>
+                            </span>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
 
-                {/* ── GRADING ── */}
-                {activeSection === 'grading' && (
-                  <div className="animate-fade">
-                    {!selectedAssignment ? (
-                      <div style={{ textAlign: 'center', padding: '60px 20px', background: card, borderRadius: '16px', border: `1px solid ${bord}` }}>
-                        <CheckCircle size={48} color={mu} style={{ marginBottom: '16px' }} />
-                        <p style={{ fontSize: '18px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Topshiriq tanlanmagan</p>
-                        <p style={{ fontSize: '14px', color: mu }}>Baholash uchun "Topshiriqlar" bo'limidan birini tanlang</p>
-                        <button
-                          onClick={() => setActiveSection('assignments')}
-                          className="btn-primary"
-                          style={{ marginTop: '16px', padding: '12px 24px', borderRadius: '10px', color: 'white', fontWeight: 600, fontSize: '14px', border: 'none', cursor: 'pointer' }}
+                    {groups.length > 0 && (
+                      <div className="tp-card" style={{ overflow: "hidden" }}>
+                        <div
+                          style={{
+                            padding: "14px 16px",
+                            borderBottom: `1px solid ${C.border}`,
+                          }}
                         >
-                          Topshiriqlarga o'tish
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-                        <button
-                          onClick={() => setActiveSection('assignments')}
-                          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', borderRadius: '10px', border: `1px solid ${bord}`, background: 'transparent', color: tx, cursor: 'pointer', fontSize: '13px', fontWeight: 500, marginBottom: '20px' }}
-                        >
-                          <span style={{ fontSize: '16px' }}>←</span>
-                          Orqaga qaytish
-                        </button>
-
-                        <div style={{ background: card, borderRadius: '16px', padding: '24px', border: `1px solid ${bord}`, marginBottom: '20px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-                            <div>
-                              <h2 style={{ fontSize: '20px', fontWeight: 700, color: tx, marginBottom: '8px' }}>{selectedAssignment.title}</h2>
-                              <p style={{ fontSize: '13px', color: mu }}>{selectedAssignment.description}</p>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <p style={{ fontSize: '12px', color: mu, marginBottom: '4px' }}>Ball: {selectedAssignment.points || 100}</p>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <Calendar size={14} color={mu} />
-                                <span style={{ fontSize: '12px', color: mu }}>{selectedAssignment.dueDate || 'Belgilanmagan'}</span>
+                          <p
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Guruhlar bo'yicha
+                          </p>
+                        </div>
+                        {groups.map((g) => {
+                          const sc =
+                            g.students?.length || g.currentStudents || 0;
+                          const max = g.maxStudents || 20;
+                          const pct = max ? Math.round((sc / max) * 100) : 0;
+                          return (
+                            <div key={g.id} className="tp-row">
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 7,
+                                  background: D ? "#27272a" : "#f4f4f5",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  color: C.text,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {g.name?.substring(0, 2)?.toUpperCase() || "GR"}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: 500,
+                                    color: C.text,
+                                  }}
+                                >
+                                  {g.name}
+                                </p>
+                                <p
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: C.muted,
+                                    marginTop: 2,
+                                  }}
+                                >
+                                  {sc}/{max} o'quvchi
+                                </p>
+                              </div>
+                              <div style={{ width: 100 }}>
+                                <div
+                                  className="tp-prog-t"
+                                  style={{ height: 5 }}
+                                >
+                                  <div
+                                    className="tp-prog-f"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <p
+                                  style={{
+                                    fontSize: 11,
+                                    color: C.muted,
+                                    textAlign: "right",
+                                    marginTop: 3,
+                                  }}
+                                >
+                                  {pct}%
+                                </p>
                               </div>
                             </div>
-                          </div>
-
-                          <h3 style={{ fontSize: '16px', fontWeight: 600, color: tx, marginBottom: '16px' }}>
-                            Topshiriq yuborilgan ({submissions.length})
-                          </h3>
-
-                          {submissions.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '40px', background: D ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: '12px' }}>
-                              <CheckCircle size={32} color={mu} style={{ marginBottom: '12px' }} />
-                              <p style={{ fontSize: '14px', color: mu }}>Hali topshiriq yuborilmagan</p>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'grid', gap: '12px' }}>
-                              {submissions.map((submission) => (
-                                <div key={submission.id} style={{ background: bgItem, borderRadius: '12px', padding: '16px', border: `1px solid ${bord}` }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                      <div style={{
-                                        width: '36px', height: '36px', borderRadius: '10px',
-                                        background: 'rgba(99,102,241,0.1)', display: 'flex',
-                                        alignItems: 'center', justifyContent: 'center',
-                                        fontSize: '16px', fontWeight: 700, color: BRAND,
-                                      }}>
-                                        {(submission.studentName || "O'quvchi")[0].toUpperCase()}
-                                      </div>
-                                      <div>
-                                        <p style={{ fontSize: '14px', fontWeight: 600, color: tx, margin: 0 }}>{submission.studentName || "O'quvchi"}</p>
-                                        <p style={{ fontSize: '12px', color: mu, margin: 0 }}>{new Date(submission.submittedAt).toLocaleDateString('uz-UZ')}</p>
-                                      </div>
-                                    </div>
-                                    {submission.graded && (
-                                      <div style={{
-                                        padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 700,
-                                        background: submission.points >= 80 ? 'rgba(34,197,94,0.1)' : submission.points >= 60 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)',
-                                        color: submission.points >= 80 ? '#22c55e' : submission.points >= 60 ? '#f59e0b' : '#ef4444',
-                                      }}>
-                                        {submission.points} ball
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <p style={{ fontSize: '13px', color: tx, lineHeight: 1.5, marginBottom: '12px', whiteSpace: 'pre-wrap' }}>
-                                    {submission.content}
-                                  </p>
-
-                                  {!submission.graded && (
-                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                      <input
-                                        id={`grade-${submission.id}`}
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        placeholder="Ball (0-100)"
-                                        className="input-field"
-                                        style={{ width: '130px', padding: '8px 12px', borderRadius: '8px' }}
-                                      />
-                                      <button
-                                        onClick={() => {
-                                          const input = document.getElementById(`grade-${submission.id}`);
-                                          if (input && input.value) gradeSubmission(selectedAssignment.id, submission.id, input.value);
-                                        }}
-                                        className="btn-primary"
-                                        style={{ padding: '8px 16px', borderRadius: '8px', color: 'white', fontWeight: 600, fontSize: '13px', border: 'none', cursor: 'pointer' }}
-                                      >
-                                        Baholash
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* ── GROUPS ── */}
-                {activeSection === 'groups' && (
-                  <div className="animate-fade">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                      <h2 style={{ fontSize: '20px', fontWeight: 700, color: tx }}>Mening Guruhlarim</h2>
-                      <p style={{ fontSize: '14px', color: mu }}>{groups.length} ta guruh</p>
+                {/* ══ HOMEWORK ══════════════════════════════ */}
+                {active === "homework" && (
+                  <div
+                    className="tp-enter"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-end",
+                        flexWrap: "wrap",
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <h2
+                          style={{
+                            fontSize: 20,
+                            fontWeight: 700,
+                            color: C.text,
+                            letterSpacing: "-.02em",
+                          }}
+                        >
+                          Uy vazifalari
+                        </h2>
+                        <p
+                          style={{ fontSize: 13, color: C.muted, marginTop: 3 }}
+                        >
+                          {homeworks.length} ta uy vazifasi
+                        </p>
+                      </div>
+                      <div style={{ position: "relative" }}>
+                        <Search
+                          size={14}
+                          style={{
+                            position: "absolute",
+                            left: 10,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            color: C.muted,
+                          }}
+                        />
+                        <input
+                          className="tp-inp"
+                          placeholder="Qidirish..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          style={{ paddingLeft: 32, width: 200 }}
+                        />
+                      </div>
+                    </div>
+
+                    {homeworks.length === 0 ? (
+                      <div className="tp-card">
+                        <div className="tp-empty">
+                          <div className="tp-empty-icon">
+                            <FileText size={22} color={C.muted} />
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Uy vazifalari yo'q
+                          </p>
+                          <p style={{ fontSize: 13, color: C.muted }}>
+                            Yuqoridagi "Yangi uy vazifasi" tugmasini bosing
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill,minmax(300px,1fr))",
+                          gap: 14,
+                        }}
+                      >
+                        {homeworks
+                          .filter(
+                            (hw) =>
+                              !search ||
+                              hw.title
+                                ?.toLowerCase()
+                                .includes(search.toLowerCase()),
+                          )
+                          .map((hw) => {
+                            const grp = groups.find((g) => g.id === hw.groupId);
+                            return (
+                              <div
+                                key={hw.id}
+                                className="tp-hw-card"
+                                onClick={() => {
+                                  setSelHW(hw);
+                                  loadSubmissions(hw.id);
+                                  goTo("grading");
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "flex-start",
+                                    marginBottom: 12,
+                                  }}
+                                >
+                                  <div style={{ flex: 1, marginRight: 8 }}>
+                                    <p
+                                      style={{
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: C.text,
+                                        lineHeight: 1.3,
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {hw.title}
+                                    </p>
+                                    {grp && (
+                                      <p
+                                        style={{
+                                          fontSize: 11.5,
+                                          color: C.muted,
+                                          marginTop: 3,
+                                        }}
+                                      >
+                                        {grp.name}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="tp-btn tp-btn-del"
+                                    onClick={(e) => deleteHW(hw.id, e)}
+                                    style={{ flexShrink: 0 }}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                                <div
+                                  className="tp-divider"
+                                  style={{ margin: "12px 0" }}
+                                />
+                                <p
+                                  style={{
+                                    fontSize: 12.5,
+                                    color: C.muted,
+                                    lineHeight: 1.55,
+                                    display: "-webkit-box",
+                                    WebkitLineClamp: 2,
+                                    WebkitBoxOrient: "vertical",
+                                    overflow: "hidden",
+                                    marginBottom: 12,
+                                  }}
+                                >
+                                  {hw.description || "Tavsif yo'q"}
+                                </p>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    gap: 10,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <span
+                                    className="tp-badge tp-badge-gray"
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Calendar size={10} />{" "}
+                                    {fmtDate(hw.deadline || hw.dueDate)}
+                                  </span>
+                                  <span
+                                    className="tp-badge tp-badge-blue"
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                    }}
+                                  >
+                                    <Star size={10} />{" "}
+                                    {hw.maxPoints || hw.points || 100} ball
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ══ GRADING ═══════════════════════════════ */}
+                {active === "grading" && (
+                  <div
+                    className="tp-enter"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    {!selHW ? (
+                      <div className="tp-card">
+                        <div className="tp-empty">
+                          <div className="tp-empty-icon">
+                            <CheckCircle size={22} color={C.muted} />
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Topshiriq tanlanmagan
+                          </p>
+                          <p style={{ fontSize: 13, color: C.muted }}>
+                            Baholash uchun "Uy vazifalari" bo'limidan birini
+                            tanlang
+                          </p>
+                          <button
+                            className="tp-btn tp-btn-default"
+                            onClick={() => goTo("homework")}
+                            style={{
+                              marginTop: 4,
+                              padding: "7px 16px",
+                              borderRadius: 7,
+                              fontSize: 13,
+                            }}
+                          >
+                            Uy vazifalariga o'tish
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <button
+                            className="tp-btn tp-btn-ghost"
+                            onClick={() => goTo("homework")}
+                            style={{
+                              marginBottom: 12,
+                              fontSize: 13,
+                              padding: "5px 0",
+                            }}
+                          >
+                            ← Orqaga
+                          </button>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              flexWrap: "wrap",
+                              gap: 12,
+                            }}
+                          >
+                            <div>
+                              <h2
+                                style={{
+                                  fontSize: 20,
+                                  fontWeight: 700,
+                                  color: C.text,
+                                  letterSpacing: "-.02em",
+                                }}
+                              >
+                                {selHW.title}
+                              </h2>
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  color: C.muted,
+                                  marginTop: 4,
+                                }}
+                              >
+                                {selHW.description}
+                              </p>
+                            </div>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <span
+                                className="tp-badge tp-badge-gray"
+                                style={{ alignItems: "center", gap: 4 }}
+                              >
+                                <Calendar size={10} />{" "}
+                                {fmtDate(selHW.deadline || selHW.dueDate)}
+                              </span>
+                              <span
+                                className="tp-badge tp-badge-blue"
+                                style={{ alignItems: "center", gap: 4 }}
+                              >
+                                <Star size={10} />{" "}
+                                {selHW.maxPoints || selHW.points || 100} ball
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="tp-card" style={{ overflow: "hidden" }}>
+                          <div
+                            style={{
+                              padding: "14px 16px",
+                              borderBottom: `1px solid ${C.border}`,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: 600,
+                                color: C.text,
+                              }}
+                            >
+                              Topshiriqlar
+                            </p>
+                            <span className="tp-badge tp-badge-gray">
+                              {submissions.length} ta
+                            </span>
+                          </div>
+                          {submissions.length === 0 ? (
+                            <div className="tp-empty">
+                              <div className="tp-empty-icon">
+                                <Send size={20} color={C.muted} />
+                              </div>
+                              <p style={{ fontSize: 13, color: C.muted }}>
+                                Hali hech kim topshirmagan
+                              </p>
+                            </div>
+                          ) : (
+                            submissions.map((s) => (
+                              <div
+                                key={s.id}
+                                style={{
+                                  padding: "16px",
+                                  borderBottom: `1px solid ${C.border}`,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    marginBottom: 10,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 10,
+                                    }}
+                                  >
+                                    <div
+                                      className="tp-avatar"
+                                      style={{
+                                        background: D ? "#27272a" : "#f4f4f5",
+                                        color: C.text,
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      {(s.studentName || "O")[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <p
+                                        style={{
+                                          fontSize: 13.5,
+                                          fontWeight: 600,
+                                          color: C.text,
+                                        }}
+                                      >
+                                        {s.studentName || "O'quvchi"}
+                                      </p>
+                                      <p
+                                        style={{
+                                          fontSize: 11.5,
+                                          color: C.muted,
+                                        }}
+                                      >
+                                        {fmtDate(s.submittedAt)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {s.graded && (
+                                    <span
+                                      className={`tp-badge ${s.points >= 80 ? "tp-badge-green" : s.points >= 60 ? "tp-badge-amber" : "tp-badge-red"}`}
+                                      style={{
+                                        fontSize: 12.5,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {s.points}/
+                                      {selHW.maxPoints || selHW.points || 100}
+                                    </span>
+                                  )}
+                                </div>
+                                <div
+                                  style={{
+                                    background: C.card2,
+                                    borderRadius: 7,
+                                    padding: "10px 13px",
+                                    marginBottom: s.graded ? 0 : 12,
+                                  }}
+                                >
+                                  <p
+                                    style={{
+                                      fontSize: 13,
+                                      color: C.text,
+                                      lineHeight: 1.6,
+                                      whiteSpace: "pre-wrap",
+                                    }}
+                                  >
+                                    {s.content}
+                                  </p>
+                                </div>
+                                {!s.graded && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      gap: 8,
+                                      alignItems: "center",
+                                      marginTop: 10,
+                                    }}
+                                  >
+                                    <input
+                                      className="tp-inp"
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      placeholder="Ball (0–100)"
+                                      style={{ width: 140 }}
+                                      value={gradeInputs[s.id] || ""}
+                                      onChange={(e) =>
+                                        setGradeInputs((p) => ({
+                                          ...p,
+                                          [s.id]: e.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <button
+                                      className="tp-btn tp-btn-default"
+                                      style={{
+                                        padding: "8px 14px",
+                                        borderRadius: 7,
+                                        fontSize: 13,
+                                      }}
+                                      onClick={() => {
+                                        grade(
+                                          selHW.id,
+                                          s.studentId,
+                                          gradeInputs[s.id],
+                                        );
+                                        setGradeInputs((p) => ({
+                                          ...p,
+                                          [s.id]: "",
+                                        }));
+                                      }}
+                                    >
+                                      <CheckCircle size={13} /> Baholash
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* ══ GROUPS ════════════════════════════════ */}
+                {active === "groups" && (
+                  <div
+                    className="tp-enter"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 20,
+                    }}
+                  >
+                    <div>
+                      <h2
+                        style={{
+                          fontSize: 20,
+                          fontWeight: 700,
+                          color: C.text,
+                          letterSpacing: "-.02em",
+                        }}
+                      >
+                        Guruhlar
+                      </h2>
+                      <p style={{ fontSize: 13, color: C.muted, marginTop: 3 }}>
+                        {groups.length} ta guruh
+                      </p>
                     </div>
 
                     {groups.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '60px 20px', background: card, borderRadius: '16px', border: `1px solid ${bord}` }}>
-                        <Layers size={48} color={mu} style={{ marginBottom: '16px' }} />
-                        <p style={{ fontSize: '18px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Sizda hali guruhlar yo'q</p>
-                        <p style={{ fontSize: '14px', color: mu }}>Admin tomondan guruh yaratilishi mumkin</p>
+                      <div className="tp-card">
+                        <div className="tp-empty">
+                          <div className="tp-empty-icon">
+                            <Layers size={22} color={C.muted} />
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: C.text,
+                            }}
+                          >
+                            Guruhlar topilmadi
+                          </p>
+                          <p style={{ fontSize: 13, color: C.muted }}>
+                            Admin tomonidan guruh tayinlanadi
+                          </p>
+                        </div>
                       </div>
                     ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))', gap: '16px' }}>
-                        {groups.map((group) => {
-                          const studentsCount = group.students?.length || group.currentStudents || 0;
-                          const maxStudents   = group.maxStudents || 20;
-                          const spotsLeft     = maxStudents - studentsCount;
-                          const isFull        = spotsLeft <= 0;
-                          const progress      = maxStudents > 0 ? Math.round((studentsCount / maxStudents) * 100) : 0;
-
+                      <div className="tp-card" style={{ overflow: "hidden" }}>
+                        {/* header */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 100px 100px 90px 80px",
+                            gap: 12,
+                            padding: "10px 16px",
+                            borderBottom: `1px solid ${C.border}`,
+                          }}
+                        >
+                          {[
+                            "Guruh nomi",
+                            "O'quvchilar",
+                            "Kurs",
+                            "Joy",
+                            "Amallar",
+                          ].map((h) => (
+                            <p
+                              key={h}
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                color: C.muted,
+                                textTransform: "uppercase",
+                                letterSpacing: ".04em",
+                              }}
+                            >
+                              {h}
+                            </p>
+                          ))}
+                        </div>
+                        {groups.map((g) => {
+                          const sc =
+                            g.students?.length || g.currentStudents || 0;
+                          const max = g.maxStudents || 20;
+                          const pct = max ? Math.round((sc / max) * 100) : 0;
                           return (
-                            <div key={group.id} style={{ background: bgItem, borderRadius: '16px', padding: '20px', border: `1px solid ${bord}` }} className="card-hover">
-                              {/* Header */}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
-                                <div style={{
-                                  width: '50px', height: '50px', borderRadius: '12px', flexShrink: 0,
-                                  background: `linear-gradient(135deg,${BRAND},${BRAND_LIGHT})`,
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  color: 'white', fontSize: '16px', fontWeight: 700,
-                                }}>
-                                  {group.name?.substring(0, 2)?.toUpperCase() || 'GR'}
+                            <div
+                              key={g.id}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "1fr 100px 100px 90px 80px",
+                                gap: 12,
+                                padding: "13px 16px",
+                                alignItems: "center",
+                                borderBottom: `1px solid ${C.border}`,
+                                transition: "background 120ms",
+                                cursor: "default",
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = D
+                                  ? "rgba(255,255,255,0.02)"
+                                  : "rgba(0,0,0,0.015)")
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background =
+                                  "transparent")
+                              }
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 7,
+                                    background: D ? "#27272a" : "#f4f4f5",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: C.text,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {g.name?.substring(0, 2)?.toUpperCase() ||
+                                    "GR"}
                                 </div>
-                                <span style={{
-                                  padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                                  background: group.status === 'active' ? '#22c55e' : '#ef4444', color: 'white',
-                                }}>
-                                  {group.status === 'active' ? 'FAOL' : 'NOFAOL'}
-                                </span>
-                              </div>
-
-                              <h3 style={{ fontSize: '18px', fontWeight: 700, color: tx, marginBottom: '12px' }}>{group.name}</h3>
-
-                              {/* Course */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                <BookOpen size={16} color={mu} />
-                                <span style={{ fontSize: '13px', color: mu }}>{group.courseTitle || group.course?.title || 'Kurs'}</span>
-                              </div>
-
-                              {/* Students count */}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                <Users size={16} color={mu} />
-                                <span style={{ fontSize: '13px', color: mu }}>
-                                  {studentsCount}/{maxStudents} o'quvchi
-                                  {isFull && (
-                                    <span style={{ marginLeft: '8px', padding: '2px 8px', borderRadius: '12px', fontSize: '10px', fontWeight: 700, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-                                      TO'LIQ
-                                    </span>
+                                <div>
+                                  <p
+                                    style={{
+                                      fontSize: 13.5,
+                                      fontWeight: 500,
+                                      color: C.text,
+                                    }}
+                                  >
+                                    {g.name}
+                                  </p>
+                                  {g.startDate && (
+                                    <p
+                                      style={{ fontSize: 11.5, color: C.muted }}
+                                    >
+                                      {fmtDate(g.startDate)}
+                                    </p>
                                   )}
-                                </span>
+                                </div>
                               </div>
-
-                              {/* Time slot */}
-                              {group.timeSlot && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                  <Clock size={16} color={mu} />
-                                  <span style={{ fontSize: '13px', color: mu }}>{group.timeSlot}</span>
+                              <p style={{ fontSize: 13, color: C.text }}>
+                                {sc} / {max}
+                              </p>
+                              <p
+                                style={{
+                                  fontSize: 13,
+                                  color: C.muted,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {g.courseTitle || g.course?.title || "—"}
+                              </p>
+                              <div>
+                                <div
+                                  className="tp-prog-t"
+                                  style={{ height: 5 }}
+                                >
+                                  <div
+                                    className="tp-prog-f"
+                                    style={{ width: `${pct}%` }}
+                                  />
                                 </div>
-                              )}
-
-                              {/* Dates */}
-                              {group.startDate && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: D ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.1)' }}>
-                                  <Calendar size={14} color={BRAND} />
-                                  <span style={{ fontSize: '12px', color: mu }}>
-                                    {new Date(group.startDate).toLocaleDateString('uz-UZ')}
-                                    {group.endDate && ` - ${new Date(group.endDate).toLocaleDateString('uz-UZ')}`}
-                                  </span>
-                                </div>
-                              )}
-
-                              {/* Progress */}
-                              <div style={{ marginTop: '12px' }}>
-                                <p style={{ fontSize: '12px', fontWeight: 600, color: mu, marginBottom: '6px' }}>Joy egalligi</p>
-                                <div className="progress-bar" style={{ height: '8px' }}>
-                                  <div className="progress-fill" style={{ width: `${progress}%` }} />
-                                </div>
-                                <div style={{ marginTop: '6px', fontSize: '12px', color: mu, display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>{progress}%</span>
-                                  <span style={{ color: isFull ? '#ef4444' : progress >= 80 ? '#f59e0b' : '#22c55e', fontWeight: 700 }}>
-                                    {isFull ? "To'liq" : spotsLeft < 5 ? 'Ostona' : spotsLeft < 10 ? 'Kam joy' : "Ko'p joy bor"}
-                                  </span>
-                                </div>
+                                <p
+                                  style={{
+                                    fontSize: 10.5,
+                                    color: C.muted,
+                                    marginTop: 3,
+                                  }}
+                                >
+                                  {pct}%
+                                </p>
+                              </div>
+                              <div>
+                                <button
+                                  onClick={() =>
+                                    navigate(`/attendance?groupId=${g.id}`)
+                                  }
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    background: D
+                                      ? "rgba(99,102,241,0.1)"
+                                      : "rgba(99,102,241,0.05)",
+                                    color: BRAND,
+                                    border: `1px solid ${D ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.15)"}`,
+                                    fontSize: "11px",
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "4px",
+                                    transition: "all 0.2s",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = BRAND;
+                                    e.currentTarget.style.color = "#fff";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = D
+                                      ? "rgba(99,102,241,0.1)"
+                                      : "rgba(99,102,241,0.05)";
+                                    e.currentTarget.style.color = BRAND;
+                                  }}
+                                >
+                                  <Calendar size={12} />
+                                  Davomat
+                                </button>
                               </div>
                             </div>
                           );
@@ -800,117 +2137,287 @@ export default function TeacherPanel() {
             )}
           </div>
         </div>
+      </div>
 
-        {/* ── CREATE MODAL ── */}
-        {showCreateModal && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-            zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
-          }}>
-            <div style={{ background: card, borderRadius: '16px', maxWidth: '500px', width: '100%', boxShadow: '0 25px 50px rgba(0,0,0,0.3)', padding: '24px', animation: 'fadeIn 0.2s ease-out' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: `1px solid ${bord}`, paddingBottom: '16px' }}>
+      {/* ─── CREATE HW MODAL ──────────────────────────────── */}
+      {showModal && (
+        <div className="tp-modal-bg">
+          <div
+            className="tp-modal-enter tp-card"
+            style={{
+              maxWidth: 480,
+              width: "100%",
+              padding: "22px",
+              boxShadow: "0 24px 60px rgba(0,0,0,.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 18,
+                paddingBottom: 14,
+                borderBottom: `1px solid ${C.border}`,
+              }}
+            >
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: C.text }}>
+                  Yangi uy vazifasi
+                </h3>
+                <p style={{ fontSize: 12.5, color: C.muted, marginTop: 2 }}>
+                  O'quvchilarga topshiriq bering
+                </p>
+              </div>
+              <button
+                className="tp-btn tp-btn-ghost"
+                onClick={() => setShowModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form
+              onSubmit={createHW}
+              style={{ display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <div>
+                <label className="tp-lbl">Sarlavha *</label>
+                <input
+                  required
+                  className="tp-inp"
+                  placeholder="Uy vazifasi nomi..."
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="tp-lbl">Tavsif *</label>
+                <textarea
+                  required
+                  className="tp-inp"
+                  placeholder="Batafsil ko'rsatma..."
+                  style={{ minHeight: 80, resize: "vertical" }}
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                />
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                }}
+              >
                 <div>
-                  <h3 style={{ fontSize: '18px', fontWeight: 700, color: tx, marginBottom: '4px' }}>Yangi Topshiriq Yaratish</h3>
-                  <p style={{ fontSize: '13px', color: mu }}>O'quvchilarga topshiriq berish</p>
+                  <label className="tp-lbl">Guruh *</label>
+                  <select
+                    required
+                    className="tp-inp"
+                    value={form.groupId}
+                    onChange={(e) =>
+                      setForm({ ...form, groupId: e.target.value })
+                    }
+                  >
+                    <option value="">Tanlang</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <button onClick={() => setShowCreateModal(false)} style={{ padding: '8px', borderRadius: '8px', background: 'transparent', border: 'none', color: mu, cursor: 'pointer' }}>
-                  <X size={20} />
+                <div>
+                  <label className="tp-lbl">Muddat *</label>
+                  <input
+                    required
+                    type="date"
+                    className="tp-inp"
+                    value={form.dueDate}
+                    onChange={(e) =>
+                      setForm({ ...form, dueDate: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="tp-lbl">Maksimum ball</label>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="tp-inp"
+                  value={form.points}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      points: parseInt(e.target.value) || 100,
+                    })
+                  }
+                />
+              </div>
+              <div>
+                <label className="tp-lbl">Rasm (ixtiyoriy)</label>
+                {form.imagePreview ? (
+                  <div style={{ position: "relative", marginTop: 8 }}>
+                    <img
+                      src={form.imagePreview}
+                      alt="Preview"
+                      style={{
+                        width: "100%",
+                        height: 200,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          imageFile: null,
+                          imagePreview: null,
+                        })
+                      }
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        padding: 6,
+                        borderRadius: "50%",
+                        background: "rgba(0,0,0,0.7)",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: 20,
+                      border: `2px dashed ${C.border}`,
+                      borderRadius: 8,
+                      textAlign: "center",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      style={{ display: "none" }}
+                      id="tp-img-upload"
+                    />
+                    <label
+                      htmlFor="tp-img-upload"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: "50%",
+                          background: D
+                            ? "rgba(255,255,255,0.1)"
+                            : "rgba(0,0,0,0.05)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <svg
+                          width={24}
+                          height={24}
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke={C.text}
+                          strokeWidth={2}
+                        >
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17,8 12,3 7,8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: C.text,
+                            margin: 0,
+                          }}
+                        >
+                          Rasm yuklash
+                        </p>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: C.muted,
+                            margin: "4px 0 0 0",
+                          }}
+                        >
+                          PNG, JPG, GIF (max 5MB)
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="tp-btn tp-btn-outline"
+                  style={{
+                    flex: 1,
+                    padding: 8,
+                    borderRadius: 7,
+                    justifyContent: "center",
+                  }}
+                  onClick={() => setShowModal(false)}
+                >
+                  Bekor
+                </button>
+                <button
+                  type="submit"
+                  disabled={modalLoading}
+                  className="tp-btn tp-btn-default"
+                  style={{
+                    flex: 2,
+                    padding: 8,
+                    borderRadius: 7,
+                    justifyContent: "center",
+                    opacity: modalLoading ? 0.6 : 1,
+                  }}
+                >
+                  {modalLoading ? (
+                    <>
+                      <RotateCw size={13} className="tp-spin" /> Saqlanmoqda…
+                    </>
+                  ) : (
+                    "Yaratish"
+                  )}
                 </button>
               </div>
-
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Topshiriq nomi</label>
-                  <input
-                    required
-                    placeholder="Topshiriq nomini kiriting..."
-                    className="input-field"
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px' }}
-                    value={form.title}
-                    onChange={e => setForm({ ...form, title: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Tavsif</label>
-                  <textarea
-                    required
-                    placeholder="Topshiriq tavsifini kiriting..."
-                    className="input-field"
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px', minHeight: '80px', resize: 'vertical' }}
-                    value={form.description}
-                    onChange={e => setForm({ ...form, description: e.target.value })}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Guruh</label>
-                    <select
-                      required
-                      className="input-field"
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px' }}
-                      value={form.groupId}
-                      onChange={e => setForm({ ...form, groupId: e.target.value })}
-                    >
-                      <option value="">Guruhni tanlang</option>
-                      {groups.map(g => (
-                        <option key={g.id} value={g.id}>{g.name} ({g.currentStudents || 0}/{g.maxStudents || 20})</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Muddat</label>
-                    <input
-                      required
-                      type="date"
-                      className="input-field"
-                      style={{ width: '100%', padding: '12px', borderRadius: '8px' }}
-                      value={form.dueDate}
-                      onChange={e => setForm({ ...form, dueDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: tx, marginBottom: '8px' }}>Ball (0-100)</label>
-                  <input
-                    required
-                    type="number"
-                    min="0"
-                    max="100"
-                    placeholder="Maksimum ball"
-                    className="input-field"
-                    style={{ width: '100%', padding: '12px', borderRadius: '8px' }}
-                    value={form.points}
-                    onChange={e => setForm({ ...form, points: parseInt(e.target.value) })}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    className="btn-secondary"
-                    style={{ flex: 1, padding: '12px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
-                  >
-                    Bekor qilish
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={modalLoading}
-                    className="btn-primary"
-                    style={{ flex: 2, padding: '12px 20px', borderRadius: '8px', color: 'white', fontWeight: 600, fontSize: '13px', border: 'none', cursor: 'pointer' }}
-                  >
-                    {modalLoading ? 'Saqlanmoqda...' : 'Yaratish'}
-                  </button>
-                </div>
-              </form>
-            </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

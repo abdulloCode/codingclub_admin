@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, BookOpen, Users, TrendingUp, Shield } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, BookOpen, Users, TrendingUp, Shield } from 'lucide-react';
 
 export default function StudentLogin() {
   const location = useLocation();
@@ -38,18 +38,35 @@ export default function StudentLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Validatsiya
+    if (!formData.phone.trim()) {
+      setError("Telefon yoki email kiriting");
+      return;
+    }
+    if (!formData.password) {
+      setError("Parolni kiriting");
+      return;
+    }
+
+    // Validatsiyadan keyin login jarayonini boshlash
     setIsLoading(true);
     try {
-      // studentLogin ni ishlatamiz - u AuthContext ni yangilaydi va redirect bo'ladi
+      // ✅ Telefon raqamni 'email' kalitiga o'rab yuboramiz
+      // Chunki backend talaba uchun 'email' maydonini kutadi
+      console.log("🔐 Student login attempt:", { phone: formData.phone, hasPassword: !!formData.password });
       await studentLogin(formData.phone, formData.password);
-      // Redirect useEffect orqali avtomatik bo'ladi
+      console.log("✅ Student login successful");
+
+      // Muvaffaqiyatli bo'lsa, useEffect orqali redirect bo'ladi
     } catch (err) {
-      setError(err.message);
-    } finally {
+      console.error("❌ Student login failed:", err);
+      setError(err.message || "Login yoki parol noto'g'ri. Iltimos, qayta urinib ko'ring.");
+      // Error bo'lganda password inputga focus qilish
+      setFocused("password");
       setIsLoading(false);
     }
   };
-
   const G = "#10b981";
   const tx = isDarkMode ? "#f5f5f7" : "#111";
   const mu = isDarkMode ? "rgba(255,255,255,0.35)" : "#9ca3af";

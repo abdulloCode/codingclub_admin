@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { SmallImageLoader } from "../components/ImageLoader";
-import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, User, Mail, Briefcase, Shield, CheckCircle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { SmallImageLoader } from '../components/ImageLoader';
+import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, User, Mail, Briefcase, Shield, CheckCircle } from 'lucide-react';
 
 const IT_SPECIALIZATIONS = [
   "Frontend Developer (React/Next.js)",
@@ -45,6 +45,26 @@ export default function TeacherRegister() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    // Validatsiya
+    if (!formData.name.trim()) {
+      setError("Ism kiritilishi shart");
+      return;
+    }
+    if (!formData.phone.trim()) {
+      setError("Telefon kiritilishi shart");
+      return;
+    }
+    if (!formData.password) {
+      setError("Parol kiritilishi shart");
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError("Parol kamida 6 ta belgi bo'lishi kerak");
+      return;
+    }
+
+    // Validatsiyadan keyin login jarayonini boshlash
     setIsLoading(true);
     try {
       console.log("Teacher register form data:", formData);
@@ -52,6 +72,7 @@ export default function TeacherRegister() {
       console.log("Teacher register response:", response);
 
       // Register'dan keyin avtomatik login qilish - teacherLogin metodini ishlatamiz
+      console.log("🔐 Auto-login after registration:", { phone: formData.phone });
       await teacherLogin(formData.phone, formData.password);
 
       // Redirect
@@ -60,9 +81,8 @@ export default function TeacherRegister() {
         navigate("/teacher-panel", { replace: true });
       }, 1500);
     } catch (err) {
-      console.error("Teacher register error:", err);
+      console.error("❌ Teacher register error:", err);
       setError(err instanceof Error ? err.message : "Ro'yxatdan o'tishda xatolik yuz berdi");
-    } finally {
       setIsLoading(false);
     }
   };

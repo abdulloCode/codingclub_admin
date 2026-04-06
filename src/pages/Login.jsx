@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
+import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   Phone, Mail, Lock, Eye, EyeOff,
   AlertCircle, ArrowRight, Users, BookOpen,
   TrendingUp, Shield, GraduationCap,
-} from "lucide-react";
+} from 'lucide-react';
 
 function Counter({ target, suffix = "" }) {
   const [val, setVal] = useState(0);
@@ -40,34 +40,36 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [focused, setFocused] = useState("");
 
-  // ✅ Role bo'yicha yo'naltirish
+  // Role bo'yicha yo'naltirish
   useEffect(() => {
-    console.log('🔍 Auth state changed:', { authLoading, userRole: user?.role });
-    
-    if (authLoading) {
-      console.log('⏳ Auth still loading...');
-      return;
-    }
-    
-    if (!user?.role) {
-      console.log('❌ No user role found');
-      return;
-    }
-    
+    if (authLoading) return;
+
+    // Agar user yo'q bo'lsa, hech narsa qilmaymiz
+    if (!user?.id) return;
+
+    console.log('🚦 User logged in:', user);
+    console.log('🚦 User role:', user?.role);
+    console.log('🚦 User ID:', user?.id);
+
     const routes = {
       admin: "/admin-panel",
       teacher: "/teacher-panel",
       student: "/students-panel",
     };
-    
-    const dest = routes[user.role];
-    console.log(`🚀 Redirecting to: ${dest} (role: ${user.role})`);
-    
+
+    const dest = routes[user?.role];
     if (dest) {
+      console.log('🚀 Redirecting to:', dest);
       navigate(dest, { replace: true });
     } else {
-      console.error('❌ Unknown role:', user.role);
-      logout();
+      console.log('⚠️ No valid role found, user:', user);
+      console.log('⚠️ User role:', user?.role);
+      console.log('⚠️ Available routes:', routes);
+      // Agar user ID bor lekin role yo'q bo'lsa, log qilib logout qilamiz
+      if (user?.id && !user?.role) {
+        console.log('🔴 User has no role, logging out...');
+        logout();
+      }
     }
   }, [user, authLoading, navigate, logout]);
 
@@ -79,64 +81,43 @@ export default function Login() {
 
   const isEmail = formData.identifier.includes("@");
 
- // Login.jsx dagi handleSubmit
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
 
-  let identifier = formData.identifier.trim().replace(/\s/g, "");
-  if (!identifier) {
-    setError("Telefon yoki email kiriting");
-    return;
-  }
-  if (!formData.password) {
-    setError("Parolni kiriting");
-    return;
-  }
-
-  setIsLoading(true);
-  try {
-    // ✅ Backend'dan kelgan noto'g'ri role'ni tuzatish uchun input tipini aniqlaymiz
-    const isPhone = /^\d+$/.test(identifier) && identifier.length >= 7;
-    let expectedRole = null;
-
-    if (isPhone) {
-      // Admin login - phone bilan
-      expectedRole = 'admin';
-    } else {
-      // Teacher/Student login - email bilan
-      // Backend'dan email bo'yicha qidirish, agar u teacher bo'lsa teacher panelga yuboramiz
-      expectedRole = 'teacher'; // Default email users are treated as teacher
+    const identifier = formData.identifier.trim().replace(/\s/g, "");
+    if (!identifier) {
+      setError("Telefon yoki email kiriting");
+      setFocused("identifier");
+      return;
+    }
+    if (!formData.password) {
+      setError("Parolni kiriting");
+      setFocused("password");
+      return;
     }
 
-    console.log('🔐 Login with expected role:', expectedRole, 'Input type:', isPhone ? 'phone' : 'email');
-
-    // Universal login with expectedRole parameter to override backend's wrong role
-    await login(identifier, formData.password, expectedRole);
-
-    // ✅ MUHIM: Backend'dan noto'g'ri role kelsa, frontend'dan override qilamiz
-    if (user?.role !== expectedRole) {
-      console.warn('⚠️ Backend returned wrong role:', user?.role, 'Expected:', expectedRole);
-      console.log('🔧 Overriding role from backend with expected role:', expectedRole);
-
-      // Override the user role locally
-      const correctedUser = { ...user, role: expectedRole };
-      localStorage.setItem('user', JSON.stringify(correctedUser));
-
-      // Force update the auth context
-      // Note: This is a temporary workaround until backend is fixed
-      setTimeout(() => {
-        window.location.reload(); // Reload to apply corrected role
-      }, 100);
+    // Validatsiya muvaffaqiyatli bo'lsa, login jarayonini boshlaymiz
+    setIsLoading(true);
+    try {
+      console.log("🔐 Attempting login with:", { identifier, hasPassword: !!formData.password });
+      const result = await login(identifier, formData.password);
+      console.log("✅ Login successful:", result);
+      // Redirect useEffect da avtomatik ishlaydi
+    } catch (err) {
+      console.error("❌ Login failed:", err);
+      // Aniq xato xabarni ko'rsatish
+      if (err.message) {
+        setError(err.message);
+      } else {
+        setError("Login yoki parol noto'g'ri. Iltimos, qayta urinib ko'ring.");
+      }
+      // Error bo'lganda password inputga focus qilish va loadingni to'xtatish
+      setFocused("password");
+      setIsLoading(false);
     }
+  };
 
-  } catch (err) {
-    console.error('❌ Login error:', err);
-    setError(err.message || "Kirishda xatolik yuz berdi.");
-  } finally {
-    setIsLoading(false);
-  }
-};
   const bg = D ? "#070d07" : "#f3f7f3";
   const cardBg = D ? "rgba(255,255,255,0.03)" : "#ffffff";
   const cardBrd = D ? "rgba(255,255,255,0.06)" : "rgba(66,122,67,0.13)";
@@ -144,8 +125,14 @@ const handleSubmit = async (e) => {
   const tx = D ? "#f5f5f7" : "#111";
 
   const inpBg = (f) => D ? (f ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)") : (f ? "#fff" : "rgba(66,122,67,0.03)");
-  const inpBrd = (f) => f ? G : D ? "rgba(255,255,255,0.08)" : "rgba(66,122,67,0.15)";
-  const inpShadow = (f) => f ? "0 0 0 3px rgba(66,122,67,0.14)" : "none";
+  const inpBrd = (f, e) => {
+    if (e) return "#ef4444"; // Error bo'lsa qizil
+    return f ? G : D ? "rgba(255,255,255,0.08)" : "rgba(66,122,67,0.15)";
+  };
+  const inpShadow = (f, e) => {
+    if (e) return "0 0 0 3px rgba(239,68,68,0.14)"; // Error shadow
+    return f ? "0 0 0 3px rgba(66,122,67,0.14)" : "none";
+  };
 
   const features = [
     { icon: Users, title: "O'quvchilar boshqaruvi", desc: "Ro'yxat, davomat va to'lovlarni kuzating" },
@@ -304,7 +291,7 @@ const handleSubmit = async (e) => {
                       </span>
                     )}
                   </div>
-                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="identifier"), border:`1px solid ${inpBrd(focused==="identifier")}`, boxShadow:inpShadow(focused==="identifier") }}>
+                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="identifier", error && !formData.identifier), border:`1px solid ${inpBrd(focused==="identifier", error && !formData.identifier)}`, boxShadow:inpShadow(focused==="identifier", error && !formData.identifier) }}>
                     {isEmail
                       ? <Mail size={15} color={focused==="identifier"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
                       : <Phone size={15} color={focused==="identifier"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
@@ -321,7 +308,7 @@ const handleSubmit = async (e) => {
 
                 <div className="lg-f2">
                   <label style={{ fontSize:10, fontWeight:800, color:mu, textTransform:"uppercase", letterSpacing:"0.07em", display:"block", marginBottom:7 }}>Parol</label>
-                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="password"), border:`1px solid ${inpBrd(focused==="password")}`, boxShadow:inpShadow(focused==="password") }}>
+                  <div className="lg-inp" style={{ display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:12, background:inpBg(focused==="password", error && !formData.password), border:`1px solid ${inpBrd(focused==="password", error && !formData.password)}`, boxShadow:inpShadow(focused==="password", error && !formData.password) }}>
                     <Lock size={15} color={focused==="password"?G:mu} style={{ flexShrink:0, transition:"color .15s" }}/>
                     <input
                       type={showPass?"text":"password"} required value={formData.password}

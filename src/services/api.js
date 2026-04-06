@@ -9,7 +9,6 @@ class ApiService {
     this.cacheTimeout = 5 * 60 * 1000;
     this.requestQueue = new Map();
   }
-
   getCacheKey(endpoint, options = {}) {
     const method = options.method || "GET";
     const body = options.body ? JSON.stringify(options.body) : "";
@@ -39,7 +38,6 @@ class ApiService {
     document.cookie = "refreshToken=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     this.clearCache();
   }
-
   async request(endpoint, options = {}) {
     const token    = this.getToken();
     const method   = (options.method || "GET").toUpperCase();
@@ -61,7 +59,7 @@ class ApiService {
     if (!navigator.onLine) throw new Error("Internet aloqasi yo'q. Tarmoqni tekshiring.");
 
     try {
-      console.log(`🔵 ${method}: ${endpoint}`);
+      console.log(` ${method}: ${endpoint}`);
       const requestPromise = (async () => {
         const controller = new AbortController();
         const timeoutId  = setTimeout(() => controller.abort(), 30000);
@@ -81,6 +79,7 @@ class ApiService {
             const errorData = await response.json().catch(() => ({}));
             let msg = errorData.message || errorData.error || `Server xatosi: ${response.status}`;
             if      (response.status === 400) msg = errorData.message || "Ma'lumotlar noto'g'ri kiritilgan.";
+            else if (response.status === 401) msg = "Parol yoki telefon raqam noto'g'ri. Iltimos, qayta urinib ko'ring.";
             else if (response.status === 403) msg = "Bu amalni bajarish uchun ruxsat yo'q.";
             else if (response.status === 404) msg = "Ma'lumot topilmadi.";
             else if (response.status === 409) msg = "Bu ma'lumot allaqachon mavjud.";
@@ -124,92 +123,54 @@ class ApiService {
       if (res?.accessToken) { this.setToken(res.accessToken); return this.request(endpoint, options); }
     } catch {
       this.clearToken();
-      // window.location.href = "/login";
       throw new Error("Sessiya tugadi, iltimos qayta kiring.");
     }
   }
 
   // ── Auth ──────────────────────────────────────────────────
-  async register(data) {
-    const res = await this.request("/api/auth/register", { method: "POST", body: JSON.stringify(data) });
-    if (res?.accessToken) this.setToken(res.accessToken);
-    return res;
-  }
-  
-  // Universal login - backend role'ini aniqlaydi, biz role'ni yubormaymiz
+  // ── Auth ──────────────────────────────────────────────────
   async login(data) {
+    // data bu yerda { email: "...", password: "..." } 
+    // yoki { phone: "...", password: "..." } ko'rinishida keladi
     const res = await this.request("/api/auth/login", {
       method: "POST",
       body: JSON.stringify(data)
     });
-
-    if (res?.accessToken) this.setToken(res.accessToken);
-    return res;
-  }
-  
-  // Teacher login - aniq teacher role bilan
-  async teacherLogin(data) {
-    // Teacher login uchun role ni header va body ga qo'shamiz
-    const loginData = {
-      ...data,
-      role: 'teacher' // Backendga teacher ekanligini bildirish
-    };
-
-    const headers = {
-      "X-User-Role": "teacher"
-    };
-
-    const res = await this.request("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify(loginData),
-      headers: headers
-    });
-
-    if (res?.accessToken) this.setToken(res.accessToken);
-
-    // Backenddan kelgan roleni tekshirish
-    console.log("Teacher login response:", res);
-
+    
+    if (res?.accessToken) {
+      this.setToken(res.accessToken);
+    }
     return res;
   }
 
-  // Student login - aniq student role bilan
+  async studentLogin(email, password) {
+    return this.login({ email, password });
+  }
+
+  async teacherLogin(email, password) {
+    return this.login({ email, password });
+  }
   async studentLogin(data) {
-    // Student login uchun role ni header va body ga qo'shamiz
-    const loginData = {
-      ...data,
-      role: 'student' // Backendga student ekanligini bildirish
-    };
-
-    const headers = {
-      "X-User-Role": "student"
-    };
-
     const res = await this.request("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify(loginData),
-      headers: headers
+      body: JSON.stringify({ ...data, role: "student" }),
+      headers: { "X-User-Role": "student" }
     });
-
     if (res?.accessToken) this.setToken(res.accessToken);
-
-    // Backenddan kelgan roleni tekshirish
-    console.log("Student login response:", res);
-
     return res;
   }
-  
-  async getProfile() { 
-    const response = await this.request("/api/auth/me", { skipCache: true });
-    console.log("GetProfile response:", response);
-    return response;
-  }
-  
-  async updateProfile(data) { return this.request("/api/auth/me", { method: "PUT", body: JSON.stringify(data) }); }
-  async refresh()           { return this.request("/api/auth/refresh", { method: "POST" }); }
+
+  async getProfile()        { return this.request("/api/auth/me",      { skipCache: true }); }
+  async updateProfile(data) { return this.request("/api/auth/me",      { method: "PUT", body: JSON.stringify(data) }); }
+  async refresh()           { return this.request("/api/auth/refresh",  { method: "POST" }); }
   async logout() {
-    try { await this.request("/api/auth/logout", { method: "POST" }); }
-    finally { this.clearToken(); }
+    try {
+      await this.request("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout so'rovida xatolik:", error.message);
+    } finally {
+      this.clearToken();
+    }
   }
 
   // ── Students ──────────────────────────────────────────────
@@ -218,14 +179,38 @@ class ApiService {
   async createStudent(data)     { return this.request("/api/students",       { method: "POST",   body: JSON.stringify(data) }); }
   async updateStudent(id, data) { return this.request(`/api/students/${id}`, { method: "PUT",    body: JSON.stringify(data) }); }
   async deleteStudent(id)       { return this.request(`/api/students/${id}`, { method: "DELETE" }); }
-  async getMyGrades()           { return this.request("/api/students/me/grades",  { skipCache: true }); }
-  async getMyHomeworks()        { return this.request("/api/students/me/homework", { skipCache: true }); }
-  async getMyStudentData()      { return this.request("/api/students/me/data",     { skipCache: true }); }
-  async assignGroupToStudent(studentId, groupId) {
-    return this.request(`/api/students/${studentId}/assign-group`, {
-      method: "POST", body: JSON.stringify({ groupId }),
-    });
+  async getMyGrades()           { return this.request("/api/students/me/grades",     { skipCache: true }); }
+  async getMyHomeworks()        { return this.request("/api/students/me/homework",   { skipCache: true }); }
+  async getMyStudentData()      { return this.request("/api/students/me/data",       { skipCache: true }); }
+  async getMyAttendanceCount()  {
+    try {
+      const attendance = await this.request("/api/students/me/attendance", { skipCache: true });
+      const records = Array.isArray(attendance) ? attendance : (attendance?.attendance || attendance?.data || []);
+      return records.filter(r => r.status === "present").length;
+    } catch (err) {
+      console.error("Davomat sonini olishda xatolik:", err);
+      return 0;
+    }
   }
+  async getMyCoins() {
+    try {
+      const data = await this.request("/api/students/me/data", { skipCache: true });
+      return data?.coins || 0;
+    } catch (err) {
+      console.error("Tangalarni olishda xatolik:", err);
+      return 0;
+    }
+  }
+  async submitHomeworkWithCode(id, data) {
+    return this.request(`/api/homework/${id}/submit`, { method: "POST", body: JSON.stringify(data) });
+  }
+ async assignGroupToStudent(studentId, groupId) {
+  return this.request(`/api/students/${studentId}/assign-group`, {
+    method: "POST",
+    body: JSON.stringify({ groupId: String(groupId).trim() }),
+    skipCache: true,
+  });
+}
   async getStudentsPaginated(page = 1, limit = 20, filters = {}) {
     const params = new URLSearchParams({ page: String(page), limit: String(limit), ...filters });
     return this.request(`/api/students?${params}`, { skipCache: true });
@@ -240,26 +225,28 @@ class ApiService {
   async createTeacher(data)     { return this.request("/api/teachers",        { method: "POST",   body: JSON.stringify(data) }); }
   async updateTeacher(id, data) { return this.request(`/api/teachers/${id}`,  { method: "PUT",    body: JSON.stringify(data) }); }
   async deleteTeacher(id)       { return this.request(`/api/teachers/${id}`,  { method: "DELETE" }); }
-  async getMyTeacherData()      { return this.request("/api/teachers/me/data",   { skipCache: true }); }
-  async getMyTeacherGroups()    { return this.request("/api/teachers/me/groups", { skipCache: true }); }
+  async getMyTeacherData()      { return this.request("/api/teachers/me/data",    { skipCache: true }); }
+  async getMyTeacherGroups()    { return this.request("/api/teachers/me/groups",  { skipCache: true }); }
   async getTeacherGroups(id)    { return this.request(`/api/teachers/${id}/groups`, { skipCache: true }); }
   async searchTeachers(query) {
     return this.request(`/api/teachers/search?q=${encodeURIComponent(query)}`, { skipCache: true });
   }
 
+  // ── Courses ───────────────────────────────────────────────
   async getCourses()            { return this.request("/api/courses"); }
   async getCourse(id)           { return this.request(`/api/courses/${id}`, { skipCache: true }); }
   async createCourse(data)      { return this.request("/api/courses",        { method: "POST",   body: JSON.stringify(data) }); }
   async updateCourse(id, data)  { return this.request(`/api/courses/${id}`,  { method: "PUT",    body: JSON.stringify(data) }); }
   async deleteCourse(id)        { return this.request(`/api/courses/${id}`,  { method: "DELETE" }); }
 
+  // ── Groups ────────────────────────────────────────────────
   async getGroups()             { return this.request("/api/groups"); }
   async getGroup(id)            { return this.request(`/api/groups/${id}`, { skipCache: true }); }
   async createGroup(data)       { return this.request("/api/groups",        { method: "POST",   body: JSON.stringify(data) }); }
   async updateGroup(id, data)   { return this.request(`/api/groups/${id}`,  { method: "PUT",    body: JSON.stringify(data) }); }
   async deleteGroup(id)         { return this.request(`/api/groups/${id}`,  { method: "DELETE" }); }
-  async getMyGroup()            { return this.request("/api/groups/me/group",  { skipCache: true }); }
-  async getMyGroups()           { return this.request("/api/groups/me/groups", { skipCache: true }); }
+  async getMyGroup()            { return this.request("/api/groups/me/group",   { skipCache: true }); }
+  async getMyGroups()           { return this.request("/api/groups/me/groups",  { skipCache: true }); }
   async addStudentToGroup(groupId, studentId) {
     return this.request(`/api/groups/${groupId}/students`, {
       method: "POST", body: JSON.stringify({ studentId }),
@@ -268,16 +255,30 @@ class ApiService {
   async removeStudentFromGroup(groupId, studentId) {
     return this.request(`/api/groups/${groupId}/students/${studentId}`, { method: "DELETE" });
   }
-
   async getGroupStudents(groupId) {
     return this.request(`/api/students?groupId=${groupId}`, { skipCache: true });
   }
 
   // ── Attendance ────────────────────────────────────────────
   async getAttendances()                   { return this.request("/api/attendance"); }
-  async getGroupAttendanceRecords(groupId) { return this.request(`/api/attendance/group/${groupId}`,    { skipCache: true }); }
+  async getGroupAttendanceRecords(groupId) { return this.request(`/api/attendance/group/${groupId}`,     { skipCache: true }); }
   async getStudentAttendance(studentId)    { return this.request(`/api/attendance/student/${studentId}`, { skipCache: true }); }
-  async getMyAttendance()                  { return this.request("/api/attendance/me/attendance",        { skipCache: true }); }
+ // TO'G'RI VARIANT:
+async getMyAttendance() {
+  return this.request("/api/attendance/me/attendance", { skipCache: true });
+}
+
+async getMyAttendanceCount() {
+  try {
+    const res = await this.getMyAttendance();
+    // Hujjatga ko'ra massiv qaytishi kerak
+    const records = Array.isArray(res) ? res : (res?.data || []);
+    return records.filter(r => r.status === "present").length;
+  } catch (err) {
+    console.error("Davomatni hisoblashda xato:", err);
+    return 0;
+  }
+}
   async createAttendance(data) {
     return this.request("/api/attendance", { method: "POST", body: JSON.stringify(data), skipCache: true });
   }
@@ -295,24 +296,24 @@ class ApiService {
   }
 
   // ── Homework ──────────────────────────────────────────────
-  async getHomeworks()            { return this.request("/api/homework"); }
-  async getHomework(id)           { return this.request(`/api/homework/${id}`, { skipCache: true }); }
-  async createHomework(data)      { return this.request("/api/homework",        { method: "POST",   body: JSON.stringify(data) }); }
-  async updateHomework(id, data)  { return this.request(`/api/homework/${id}`,  { method: "PUT",    body: JSON.stringify(data) }); }
-  async deleteHomework(id)        { return this.request(`/api/homework/${id}`,  { method: "DELETE" }); }
-  async submitHomework(id, data)  { return this.request(`/api/homework/${id}/submit`, { method: "POST", body: JSON.stringify(data) }); }
-  async gradeHomework(id, data)   { return this.request(`/api/homework/${id}/grade`,  { method: "POST", body: JSON.stringify(data) }); }
-  async getHomeworkSubmissions(id){ return this.request(`/api/homework/${id}/submissions`, { skipCache: true }); }
-  async getMySubmissions()        { return this.request("/api/homework/me/submissions", { skipCache: true }); }
+  async getHomeworks()             { return this.request("/api/homework"); }
+  async getHomework(id)            { return this.request(`/api/homework/${id}`, { skipCache: true }); }
+  async createHomework(data)       { return this.request("/api/homework",        { method: "POST",   body: JSON.stringify(data) }); }
+  async updateHomework(id, data)   { return this.request(`/api/homework/${id}`,  { method: "PUT",    body: JSON.stringify(data) }); }
+  async deleteHomework(id)         { return this.request(`/api/homework/${id}`,  { method: "DELETE" }); }
+  async submitHomework(id, data)   { return this.request(`/api/homework/${id}/submit`, { method: "POST", body: JSON.stringify(data) }); }
+  async gradeHomework(id, data)    { return this.request(`/api/homework/${id}/grade`,  { method: "POST", body: JSON.stringify(data) }); }
+  async getHomeworkSubmissions(id) { return this.request(`/api/homework/${id}/submissions`, { skipCache: true }); }
+  async getMySubmissions()         { return this.request("/api/homework/me/submissions", { skipCache: true }); }
 
-  // ── Articles (Blog) ───────────────────────────────────────
+  // ── Articles ──────────────────────────────────────────────
   async getArticles(params = "")  { return this.request(`/api/admin/articles${params}`); }
   async getArticle(id)            { return this.request(`/api/admin/articles/${id}`, { skipCache: true }); }
   async createArticle(data)       { return this.request("/api/admin/articles",       { method: "POST",   body: JSON.stringify(data) }); }
   async updateArticle(id, data)   { return this.request(`/api/admin/articles/${id}`, { method: "PUT",    body: JSON.stringify(data) }); }
   async deleteArticle(id)         { return this.request(`/api/admin/articles/${id}`, { method: "DELETE" }); }
 
-  // ── Reports / Dashboard ───────────────────────────────────
+  // ── Reports ───────────────────────────────────────────────
   async getDashboard()        { return this.request("/api/reports/dashboard"); }
   async getStudentReport(id)  { return this.request(`/api/reports/student/${id}`,  { skipCache: true }); }
   async getTeacherReport(id)  { return this.request(`/api/reports/teacher/${id}`,  { skipCache: true }); }
@@ -320,8 +321,8 @@ class ApiService {
   async getCourseReport(id)   { return this.request(`/api/reports/course/${id}`,   { skipCache: true }); }
   async getAttendanceReport() { return this.request("/api/reports/attendance",     { skipCache: true }); }
   async getPaymentsReport()   { return this.request("/api/reports/payments",       { skipCache: true }); }
-  // Leaderboard endpoint backendda yo'q, o'chirildi
-  // async getLeaderboard()      { return this.request("/api/reports/leaderboard",    { skipCache: true }); }
+  // ✅ YANGI: Leaderboard — backend endpoint yo'q bo'lsa xato chiqarmaydi
+  async getLeaderboard()      { return this.request("/api/reports/leaderboard",    { skipCache: true }); }
 
   // ── Payments ──────────────────────────────────────────────
   async getPayments()            { return this.request("/api/payments"); }
@@ -336,7 +337,7 @@ class ApiService {
   async getNotifications()         { return this.request("/api/notifications", { skipCache: true }); }
   async markNotificationAsRead(id) { return this.request(`/api/notifications/${id}/read`, { method: "POST" }); }
 
-  // ── Helpers ───────────────────────────────────────────────
+  // ── Dashboard helper ──────────────────────────────────────
   async fetchDashboardData() {
     return Promise.all([
       this.getStudents(), this.getTeachers(), this.getGroups(), this.getCourses(),

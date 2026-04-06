@@ -34,7 +34,6 @@ export default function TeacherLayout() {
     { icon: Layers,        label: 'Guruhlarim',     path: '/teacher-groups' },
     { icon: FileText,      label: 'Topshiriqlar',   path: '/teacher-homework' },
     { icon: CheckCircle,   label: 'Baholash',       path: '/teacher-grading' },
-    { icon: Bell,         label: 'Davomat',        path: '/teacher-attendance' },
     { icon: Settings,      label: 'Sozlamalar',     path: '/settings' },
   ];
 
@@ -820,7 +819,6 @@ export default function TeacherLayout() {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
                         {[
                           { icon: FileText, label: 'Topshiriq yaratish', onClick: () => navigate('/teacher-homework') },
-                          { icon: Bell, label: 'Davomatni ko\'rish', onClick: () => navigate('/teacher-attendance') },
                           { icon: Users, label: 'Guruhlarni ko\'rish', onClick: () => navigate('/teacher-groups') },
                           { icon: Settings, label: 'Sozlamalar', onClick: () => navigate('/settings') },
                         ].map((action, i) => {
@@ -890,28 +888,6 @@ export default function TeacherLayout() {
                             Mening guruhlarim bo'yicha
                           </p>
                         </div>
-                        <button
-                          onClick={() => navigate('/teacher-attendance')}
-                          style={{
-                            padding: '8px 16px',
-                            borderRadius: '8px',
-                            background: BRAND,
-                            color: 'white',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: 500,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            transition: 'opacity 0.2s',
-                          }}
-                          onMouseOver={(e) => e.currentTarget.style.opacity = '0.9'}
-                          onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
-                        >
-                          Batafsil
-                          <ChevronRight size={14} />
-                        </button>
                       </div>
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>

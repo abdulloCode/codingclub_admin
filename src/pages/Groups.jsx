@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { apiService } from "../services/api";
+import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { apiService } from '../services/api';
 import {
   Layers, Plus, Search, Edit3, Trash2,
   Users, BookOpen, Calendar, X, Save,
@@ -9,7 +9,8 @@ import {
   RefreshCw, GraduationCap, ChevronRight,
   ChevronLeft, AlertTriangle, Clock, Hash,
   ArrowUpRight, BarChart3, Shield, Filter,
-} from "lucide-react";
+  Bell, UserCheck, FileText, MessageSquare,
+} from 'lucide-react';
 
 /* ─── CONSTANTS ──────────────────────────────────────────────── */
 const BRAND       = "#427A43";
@@ -348,13 +349,16 @@ function CalendarPicker({ startDate, endDate, onChange, onClose, D }) {
 }
 
 /* ─── GROUP CARD ─────────────────────────────────────────────── */
-function GroupCard({ g, isAdmin, onEdit, onDelete, onStudents, onSelect, selected, getCourseName, getTeacherName, D, index }) {
+function GroupCard({ g, isAdmin, onEdit, onDelete, onStudents, onSelect, selected, getCourseName, getTeacherName, D, index, students }) {
   const card  = D ? "rgba(22,22,24,0.95)" : "#fff";
   const bord  = selected ? "rgba(66,122,67,0.45)" : D ? "rgba(255,255,255,0.07)" : "rgba(66,122,67,0.12)";
   const tx    = D ? "#f5f5f7" : "#1a1a1a";
   const mu    = D ? "rgba(245,245,247,0.45)" : "rgba(0,0,0,0.45)";
   const rowBg = D ? "rgba(66,122,67,0.09)" : "rgba(66,122,67,0.05)";
-  const pct   = g.maxStudents ? Math.round(((g.currentStudents || 0) / g.maxStudents) * 100) : 0;
+
+  // Calculate actual student count from students array
+  const actualStudentCount = students ? students.filter(s => s.groupId == g.id).length : (g.currentStudents || 0);
+  const pct = g.maxStudents ? Math.round((actualStudentCount / g.maxStudents) * 100) : 0;
 
   return (
     <div className="gg-card" onClick={() => onSelect(g)} style={{
@@ -413,7 +417,7 @@ function GroupCard({ g, isAdmin, onEdit, onDelete, onStudents, onSelect, selecte
               <Users size={10} /> O'quvchilar
             </span>
             <span style={{ fontSize: 11, fontWeight: 800, color: BRAND }}>
-              {g.currentStudents || 0}/{g.maxStudents}
+              {actualStudentCount}/{g.maxStudents}
             </span>
           </div>
           <ProgressBar pct={pct} height={4} />
@@ -674,11 +678,29 @@ function StudentsModal({ group, students, onAdd, onRemove, onClose, D }) {
 
   if (!group) return null;
 
-  const groupStudents = students.filter(s => s.groupId === group.id);
-  const otherStudents = students.filter(s => s.groupId !== group.id).filter(s => {
-    const q = search.toLowerCase();
-    return !q || sName(s).toLowerCase().includes(q) || sContact(s).toLowerCase().includes(q);
+  // Debug log to help diagnose issues
+  console.log(`🎯 Group ${group.id} (${group.name}) - Filtering ${students.length} students`);
+  console.log("👥 Students with groupId:", students.filter(s => s.groupId).map(s => ({ id: s.id, groupId: s.groupId, name: sName(s) })));
+
+  // Filter students by exact groupId match (both string and number comparison)
+  const groupStudents = students.filter(s => {
+    const studentGroupId = s.groupId;
+    const groupId = group.id;
+    // Handle both string and number comparisons
+    const match = studentGroupId == groupId;
+    if (match) console.log(`✅ Student ${sName(s)} (${s.id}) belongs to group ${groupId}`);
+    return match;
   });
+
+  const otherStudents = students.filter(s => {
+    const studentGroupId = s.groupId;
+    const groupId = group.id;
+    const notInGroup = studentGroupId != groupId;
+    const q = search.toLowerCase();
+    const matchesSearch = !q || sName(s).toLowerCase().includes(q) || sContact(s).toLowerCase().includes(q);
+    return notInGroup && matchesSearch;
+  });
+
   const pct = group.maxStudents ? Math.round((groupStudents.length / group.maxStudents) * 100) : 0;
 
   const card  = D ? "rgba(18,18,20,0.98)" : "#fff";
@@ -895,18 +917,21 @@ function DeleteModal({ groupId, onConfirm, onCancel, D }) {
 }
 
 /* ─── DETAIL PANEL ───────────────────────────────────────────── */
-function DetailPanel({ g, getCourseName, getTeacherName, onEdit, onDelete, onClose, D }) {
+function DetailPanel({ g, getCourseName, getTeacherName, onEdit, onDelete, onClose, D, students }) {
   const card  = D ? "rgba(22,22,24,0.97)" : "#fff";
   const bord  = D ? "rgba(255,255,255,0.07)" : "rgba(66,122,67,0.12)";
   const tx    = D ? "#f5f5f7" : "#1a1a1a";
   const mu    = D ? "rgba(245,245,247,0.45)" : "rgba(0,0,0,0.45)";
   const rowBg = D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.05)";
 
+  // Calculate actual student count
+  const actualStudentCount = students ? students.filter(s => s.groupId == g.id).length : (g.currentStudents || 0);
+
   const details = [
     { icon: BookOpen,      label: "Kurs",       val: getCourseName(g.courseId) },
     { icon: GraduationCap, label: "O'qituvchi", val: getTeacherName(g.teacherId) },
     { icon: Calendar,      label: "Muddat",     val: `${fmt(g.startDate)} → ${fmt(g.endDate)}` },
-    { icon: Hash,          label: "Kapasitet",  val: `${g.currentStudents || 0} / ${g.maxStudents}` },
+    { icon: Hash,          label: "Kapasitet",  val: `${actualStudentCount} / ${g.maxStudents}` },
   ];
 
   return (
@@ -1008,6 +1033,8 @@ export default function Groups() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [toast,        setToast]        = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1019,21 +1046,32 @@ export default function Groups() {
     try {
       setLoading(true);
       let groupsRaw;
-      if (user?.role === "teacher")       groupsRaw = await apiService.getMyGroups?.() || await apiService.getGroups();
+      if (user?.role === "teacher") {
+        const allGroups = await apiService.getGroups();
+        const all = normalize(allGroups);
+        groupsRaw = all.filter(g => g.teacherId === user.id);
+      }
       else if (user?.role === "student")  { const g = await apiService.getMyGroup?.(); groupsRaw = g ? [g] : []; }
       else                                groupsRaw = await apiService.getGroups();
 
-      const [cRaw, tRaw, sRaw] = await Promise.all([
+      const [cRaw, tRaw, sRaw, notifRaw] = await Promise.all([
         apiService.getCourses().catch(() => []),
         apiService.getTeachers().catch(() => []),
         apiService.getStudents().catch(() => []),
+        apiService.getNotifications().catch(() => []),
       ]);
+
+      // Normalize and ensure students have proper groupId
+      const normalizedStudents = normalize(sRaw);
+      console.log("📊 Students loaded:", normalizedStudents.length);
 
       setGroups(normalize(groupsRaw));
       setCourses(normalize(cRaw));
       setTeachers(normalize(tRaw));
-      setStudents(normalize(sRaw));
+      setStudents(normalizedStudents);
+      setNotifications(Array.isArray(notifRaw) ? notifRaw : (notifRaw?.notifications || []));
     } catch (err) {
+      console.error("❌ Fetch error:", err);
       showToast(err.message || "Yuklashda xatolik", "error");
     } finally {
       setLoading(false);
@@ -1041,6 +1079,21 @@ export default function Groups() {
   };
 
   useEffect(() => { fetchData(); }, [user?.role]);
+
+  // Close notification panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications) {
+        const notificationPanel = document.querySelector('[data-notification-panel="true"]');
+        if (notificationPanel && !notificationPanel.contains(event.target)) {
+          setShowNotifications(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showNotifications]);
 
   /* ── Submit ─────────────────────────────────────────────── */
   const handleSubmit = async (e) => {
@@ -1101,15 +1154,43 @@ export default function Groups() {
   };
 
   /* ── Student management ─────────────────────────────────── */
+  const refreshStudentsData = async () => {
+    try {
+      const sRaw = await apiService.getStudents().catch(() => []);
+      const normalizedStudents = normalize(sRaw);
+      console.log("🔄 Refreshed students:", normalizedStudents.length);
+      setStudents(normalizedStudents);
+    } catch (err) {
+      console.error("❌ Refresh students error:", err);
+    }
+  };
+
   const handleAddStudent = async (studentId) => {
     try {
       const res = await apiService.addStudentToGroup(studentsModal.id, studentId);
-      const updatedGroup = res?.group || res;
+      // API returns: { message: "...", student: StudentObject, group: GroupObject }
+      const updatedStudent = res?.student;
+      const updatedGroup = res?.group;
+
       if (updatedGroup) {
         setGroups(gs => gs.map(g => g.id === updatedGroup.id ? { ...g, ...updatedGroup } : g));
         setStudentsModal(prev => ({ ...prev, ...updatedGroup }));
       }
-      setStudents(ss => ss.map(s => s.id === studentId ? { ...s, groupId: studentsModal.id } : s));
+
+      // Use the returned student object or update locally
+      if (updatedStudent) {
+        setStudents(ss => ss.map(s =>
+          s.id === updatedStudent.id ? { ...s, ...updatedStudent } : s
+        ));
+      } else {
+        // Fallback: update locally using the correct groupId
+        setStudents(ss => ss.map(s =>
+          s.id === studentId ? { ...s, groupId: studentsModal.id } : s
+        ));
+      }
+
+      // Refresh students data to ensure consistency
+      await refreshStudentsData();
       showToast("O'quvchi guruhga qo'shildi");
     } catch (err) {
       showToast(err.message || "Xatolik", "error");
@@ -1119,12 +1200,28 @@ export default function Groups() {
   const handleRemoveStudent = async (studentId) => {
     try {
       const res = await apiService.removeStudentFromGroup(studentsModal.id, studentId);
-      const updatedGroup = res?.group || res;
+      const updatedStudent = res?.student;
+      const updatedGroup = res?.group;
+
       if (updatedGroup) {
         setGroups(gs => gs.map(g => g.id === updatedGroup.id ? { ...g, ...updatedGroup } : g));
         setStudentsModal(prev => ({ ...prev, ...updatedGroup }));
       }
-      setStudents(ss => ss.map(s => s.id === studentId ? { ...s, groupId: null } : s));
+
+      // Use the returned student object or update locally
+      if (updatedStudent) {
+        setStudents(ss => ss.map(s =>
+          s.id === updatedStudent.id ? { ...s, ...updatedStudent } : s
+        ));
+      } else {
+        // Fallback: update locally
+        setStudents(ss => ss.map(s =>
+          s.id === studentId ? { ...s, groupId: null } : s
+        ));
+      }
+
+      // Refresh students data to ensure consistency
+      await refreshStudentsData();
       showToast("O'quvchi guruhdan olib tashlandi");
     } catch (err) {
       showToast(err.message || "Xatolik", "error");
@@ -1139,6 +1236,48 @@ export default function Groups() {
   const getCourseName = id => {
     const c = courses.find(c => c.id === id);
     return c?.title || c?.name || "—";
+  };
+
+  /* ── Notification handling ─────────────────────────────────── */
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await apiService.markNotificationAsRead(notificationId);
+      setNotifications(prev => prev.map(n =>
+        n.id === notificationId ? { ...n, read: true } : n
+      ));
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'student_added':
+        return <UserPlus size={14} color={BRAND} />;
+      case 'student_removed':
+        return <XCircle size={14} color="#ef4444" />;
+      case 'homework_submitted':
+        return <FileText size={14} color="#3b82f6" />;
+      case 'attendance':
+        return <CheckCircle size={14} color="#22c55e" />;
+      default:
+        return <Bell size={14} color={BRAND} />;
+    }
+  };
+
+  const getNotificationTime = (createdAt) => {
+    if (!createdAt) return '';
+    const date = new Date(createdAt);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'hozir';
+    if (diffMins < 60) return `${diffMins} daqiqa oldin`;
+    if (diffHours < 24) return `${diffHours} soat oldin`;
+    return `${diffDays} kun oldin`;
   };
 
   const openAdd = () => {
@@ -1188,7 +1327,7 @@ export default function Groups() {
   const stats = [
     { icon: Layers,      label: "Jami guruhlar",    value: groups.length,                                                        color: BRAND,     pale: "rgba(66,122,67,0.10)"   },
     { icon: CheckCircle, label: "Faol guruhlar",    value: groups.filter(g => g.status === "active").length,                    color: "#22c55e", pale: "rgba(34,197,94,0.10)"   },
-    { icon: Users,       label: "Jami o'quvchilar", value: groups.reduce((a, g) => a + (g.currentStudents || 0), 0),            color: "#3b82f6", pale: "rgba(59,130,246,0.10)"  },
+    { icon: Users,       label: "Jami o'quvchilar", value: students.filter(s => s.groupId).length,                              color: "#3b82f6", pale: "rgba(59,130,246,0.10)"  },
     { icon: BookOpen,    label: "Kurslar",           value: [...new Set(groups.map(g => g.courseId))].length,                   color: "#f59e0b", pale: "rgba(245,158,11,0.10)"  },
   ];
 
@@ -1236,6 +1375,136 @@ export default function Groups() {
                      value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                      style={{ background: "transparent", border: "none", outline: "none",
                               fontSize: 13, color: tx, width: 150, padding: 0 }} />
+            </div>
+
+            {/* Notifications */}
+            <div style={{ position: "relative" }} data-notification-panel="true">
+              <button className="gg-btn" onClick={() => setShowNotifications(!showNotifications)} style={{
+                width: 36, height: 36, borderRadius: 11,
+                background: showNotifications ? "rgba(66,122,67,0.15)" : "rgba(66,122,67,0.09)",
+                border: `1px solid ${bord}`, color: BRAND,
+              }}>
+                <Bell size={14} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <div style={{
+                    position: "absolute", top: -4, right: -4,
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: "#ef4444", color: "#fff",
+                    fontSize: 10, fontWeight: 700,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 2px 4px rgba(239,68,68,0.3)",
+                  }}>
+                    {notifications.filter(n => !n.read).length}
+                  </div>
+                )}
+              </button>
+
+              {/* Notification Panel */}
+              {showNotifications && (
+                <div style={{
+                  position: "absolute", top: 45, right: 0,
+                  width: 320, maxHeight: 400, zIndex: 100,
+                  background: card, border: `1px solid ${bord}`,
+                  borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,0.2)",
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    padding: "14px 16px",
+                    borderBottom: `1px solid ${bord}`,
+                    background: D ? "rgba(66,122,67,0.05)" : "rgba(66,122,67,0.03)",
+                  }}>
+                    <h3 style={{
+                      fontSize: 13, fontWeight: 700, color: tx, margin: 0,
+                      display: "flex", alignItems: "center", gap: 8,
+                    }}>
+                      <Bell size={14} color={BRAND} />
+                      Bildirishnomalar
+                      <span style={{
+                        marginLeft: "auto",
+                        fontSize: 10, fontWeight: 600,
+                        padding: "2px 8px", borderRadius: 8,
+                        background: `rgba(66,122,67,0.1)`,
+                        color: BRAND,
+                      }}>
+                        {notifications.filter(n => !n.read).length} yangi
+                      </span>
+                    </h3>
+                  </div>
+
+                  <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                    {notifications.length === 0 ? (
+                      <div style={{
+                        padding: 40, textAlign: "center",
+                        color: mu, fontSize: 12,
+                      }}>
+                        <Bell size={32} color={mu} style={{ marginBottom: 12, opacity: 0.3 }} />
+                        <p>Hali bildirishnoma yo'q</p>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => !notif.read && handleMarkAsRead(notif.id)}
+                          style={{
+                            padding: "12px 16px",
+                            borderBottom: `1px solid ${bord}`,
+                            cursor: !notif.read ? "pointer" : "default",
+                            background: notif.read ? "transparent" : D ? "rgba(66,122,67,0.05)" : "rgba(66,122,67,0.03)",
+                            transition: "background 0.2s",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!notif.read) {
+                              e.target.style.background = D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.06)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!notif.read) {
+                              e.target.style.background = D ? "rgba(66,122,67,0.05)" : "rgba(66,122,67,0.03)";
+                            }
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 8,
+                              background: D ? "rgba(66,122,67,0.1)" : "rgba(66,122,67,0.08)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0,
+                            }}>
+                              {getNotificationIcon(notif.type)}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{
+                                display: "flex", justifyContent: "space-between",
+                                alignItems: "flex-start", marginBottom: 4,
+                              }}>
+                                <p style={{
+                                  fontSize: 12, fontWeight: 600, color: tx,
+                                  margin: 0, lineHeight: 1.3,
+                                }}>
+                                  {notif.message || notif.title || "Bildirishnoma"}
+                                </p>
+                                {!notif.read && (
+                                  <div style={{
+                                    width: 8, height: 8, borderRadius: "50%",
+                                    background: BRAND,
+                                    flexShrink: 0,
+                                    boxShadow: "0 0 0 2px rgba(66,122,67,0.1)",
+                                  }} />
+                                )}
+                              </div>
+                              <p style={{
+                                fontSize: 10, color: mu, margin: 0,
+                              }}>
+                                {getNotificationTime(notif.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <button className="gg-btn" onClick={fetchData} style={{
@@ -1369,6 +1638,7 @@ export default function Groups() {
                     getCourseName={getCourseName}
                     getTeacherName={getTeacherName}
                     D={D} index={i}
+                    students={students}
                   />
                 ))}
               </div>
@@ -1382,6 +1652,7 @@ export default function Groups() {
                   onDelete={setDeleteTarget}
                   onClose={() => setDetailGroup(null)}
                   D={D}
+                  students={students}
                 />
               )}
             </div>

@@ -164,7 +164,6 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => { checkAuth(); }, [checkAuth]);
 
   const login = async (identifier, password, expectedRole = null) => {
-    setIsLoading(true);
     try {
       const loginData = identifier.includes('@')
         ? { email: identifier, password }
@@ -202,8 +201,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Login error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -215,12 +212,12 @@ export const AuthProvider = ({ children }) => {
         : { phone: identifier, password };
 
       console.log('🔐 Teacher login request:', loginData);
-      
+
       apiService.clearCache();
       const response = await apiService.teacherLogin(loginData);
-      
+
       console.log('📦 Teacher login response:', response);
-      
+
       const finalUser = extractUserAndRole(response);
 
       if (!finalUser) {
@@ -239,8 +236,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Teacher login error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -252,12 +247,12 @@ export const AuthProvider = ({ children }) => {
         : { phone: identifier, password };
 
       console.log('🔐 Admin login request:', loginData);
-      
+
       apiService.clearCache();
       const response = await apiService.login(loginData);
-      
+
       console.log('📦 Admin login response:', response);
-      
+
       const finalUser = extractUserAndRole(response);
 
       if (!finalUser) {
@@ -276,8 +271,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Admin login error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -289,12 +282,12 @@ export const AuthProvider = ({ children }) => {
         : { phone: identifier, password };
 
       console.log('🔐 Student login request:', loginData);
-      
+
       apiService.clearCache();
       const response = await apiService.studentLogin(loginData);
-      
+
       console.log('📦 Student login response:', response);
-      
+
       const finalUser = extractUserAndRole(response);
 
       if (!finalUser) {
@@ -313,8 +306,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('❌ Student login error:', error);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -344,14 +335,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    try { 
-      await apiService.logout(); 
+    console.log('🚪 Logout called, current user:', user);
+    try {
+      await apiService.logout();
+      console.log('✅ API logout successful');
     } catch (error) {
-      console.error('Logout error:', error);
-    } finally { 
-      apiService.clearToken(); 
+      console.error('❌ Logout error:', error);
+      // API logout xatolik bo'lsa ham tokenni o'chirib ketamiz
+    } finally {
+      console.log('🧹 Clearing all auth data');
+      apiService.clearToken();
       localStorage.removeItem('user');
-      setUser(null); 
+      setUser(null);
+      console.log('✅ All auth data cleared');
     }
   };
 

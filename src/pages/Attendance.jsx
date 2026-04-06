@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { apiService } from "../services/api";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { apiService } from '../services/api';
 import {
   Users, RefreshCw, ChevronLeft, ChevronRight,
   CheckCircle, XCircle, Save, BookOpen,
-  Search, Trash2, X, UserPlus,
-} from "lucide-react";
+  Search, Trash2, X, UserPlus, ArrowLeft,
+} from 'lucide-react';
 
 /* ─── CONSTANTS ─────────────────────────────────────────────── */
 const MONTH_NAMES = [
@@ -136,19 +137,35 @@ function AddStudentModal({ isOpen, onClose, availableStudents, onAdd }) {
 }
 
 /* ─── TOGGLE SWITCH ──────────────────────────────────────────── */
-function Toggle({ on, onChange, disabled }) {
+function Toggle({ on, onChange, disabled, isOwner, user }) {
+  // Agar disabled bo'lsa (kecha kunlar):
+  //   - Admin har qachon o'zgartira oladi
+  //   - Teacher faqat o'zi o'zgartirgan yozuvni o'zgartira oladi (isOwner === true)
+  // Agar disabled bo'lmasa (bugun):
+  //   - Har kim o'zgartira oladi
+  const canEdit = !disabled || (user?.role === 'admin') || isOwner;
+
   return (
     <button
       type="button"
-      onClick={() => !disabled && onChange(!on)}
-      disabled={disabled}
+      onClick={() => canEdit && onChange(!on)}
+      disabled={!canEdit}
       className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
-        disabled
+        !canEdit
           ? "opacity-25 cursor-not-allowed " + (on ? "bg-green-500" : "bg-red-400")
           : on
             ? "bg-green-500 shadow-sm shadow-green-500/40 cursor-pointer"
             : "bg-red-400 shadow-sm shadow-red-400/30 cursor-pointer"
       }`}
+      title={
+        !canEdit && disabled
+          ? user?.role === 'admin'
+            ? "Admin kecha kunlarini ham o'zgartira oladi"
+            : isOwner
+              ? "Siz bu yozuvni o'zgartirgansiz"
+              : "Bu yozuvni faqat o'zgartirgan odam o'zgartira oladi"
+          : undefined
+      }
     >
       <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${
         on ? "left-5" : "left-0.5"
@@ -161,6 +178,8 @@ function Toggle({ on, onChange, disabled }) {
 export default function Attendance() {
   const { user }     = useAuth();
   const { isDarkMode: D } = useTheme();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [groups,        setGroups]        = useState([]);
   const [allStudents,   setAllStudents]   = useState([]);
@@ -176,9 +195,15 @@ export default function Attendance() {
   const [lastSavedTime, setLastSavedTime] = useState(null);
   const [saveErrors,    setSaveErrors]    = useState([]);
 
+  // Toggle buttonlarni shaxsiy qilish uchun - har bir odam o'zgartirganini kuzatish
+  const [userChanges,   setUserChanges]   = useState(new Set());
+
   const now = new Date();
   const [viewYear,  setViewYear]  = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  // URL dan guruh ID olish
+  const groupIdFromUrl = searchParams.get('groupId');
 
   // ✅ days ni useMemo bilan oldindan hisoblash — useCallback ichida xavfsiz ishlatish uchun
   const daysInMonth    = new Date(viewYear, viewMonth + 1, 0).getDate();
@@ -223,7 +248,18 @@ export default function Attendance() {
         const st = normSt(await apiService.getStudents().catch(() => []));
         setGroups(gr);
         setAllStudents(st);
-        if (gr.length) setSelGroup(gr[0]);
+
+        // URL dan kelgan guruh ID bo'yicha tanlash
+        if (groupIdFromUrl) {
+          const targetGroup = gr.find(g => g.id === groupIdFromUrl);
+          if (targetGroup) {
+            setSelGroup(targetGroup);
+          } else {
+            showToast("Guruh topilmadi", "error");
+          }
+        } else if (gr.length) {
+          setSelGroup(gr[0]);
+        }
       } catch (err) {
         showToast(err.message || "Yuklashda xatolik", "error");
       } finally {
@@ -290,6 +326,7 @@ export default function Attendance() {
           status: r.status || "absent",
           id: r.id,
           changed: false,
+          createdBy: r.createdBy || r.teacherId || null,
         };
       });
 
@@ -349,11 +386,12 @@ export default function Attendance() {
               groupId: selGroup.id,
               date: ds,
               status,
+              createdBy: cell.createdBy || user?.id || user?.userId || null,
             };
 
             if (cell.id) {
               promises.push(
-                apiService.updateAttendance(cell.id, { status })
+                apiService.updateAttendance(cell.id, { status, createdBy: cell.createdBy || user?.id || user?.userId || null })
                   .then(() => ({ success: true, studentId: student.id, date: ds }))
                   .catch(err => ({ success: false, studentId: student.id, date: ds, error: err }))
               );
@@ -421,6 +459,7 @@ export default function Attendance() {
             groupId: selGroup.id,
             date: ds,
             status,
+            createdBy: cell?.createdBy || user?.id || user?.userId || null,
           };
           if (cell?.id) record.id = cell.id;
           records.push(record);
@@ -469,13 +508,23 @@ export default function Attendance() {
 
   const togglePresent = (studentId, ds) => {
     setAtt(prev => {
-      const old        = prev[studentId]?.[ds] ?? { present: false, status: "absent", changed: false };
+      const old = prev[studentId]?.[ds] ?? { present: false, status: "absent", changed: false, createdBy: null };
       const nowPresent = !old.present;
+
+      // O'zgartirgan odamni tracking qilish
+      setUserChanges(prev => new Set([...prev, studentId]));
+
       return {
         ...prev,
         [studentId]: {
           ...prev[studentId],
-          [ds]: { ...old, present: nowPresent, status: nowPresent ? "present" : "absent", changed: true },
+          [ds]: {
+            ...old,
+            present: nowPresent,
+            status: nowPresent ? "present" : "absent",
+            changed: true,
+            createdBy: user?.id || user?.userId || null
+          },
         },
       };
     });
@@ -483,13 +532,24 @@ export default function Attendance() {
   };
 
   const setLate = (studentId, ds) => {
-    setAtt(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [ds]: { ...(prev[studentId]?.[ds] ?? { present: true, changed: false }), present: true, status: "late", changed: true },
-      },
-    }));
+    setAtt(prev => {
+      // O'zgartirgan odamni tracking qilish
+      setUserChanges(prev => new Set([...prev, studentId]));
+
+      return {
+        ...prev,
+        [studentId]: {
+          ...prev[studentId],
+          [ds]: {
+            ...(prev[studentId]?.[ds] ?? { present: true, changed: false, createdBy: null }),
+            present: true,
+            status: "late",
+            changed: true,
+            createdBy: user?.id || user?.userId || null
+          },
+        },
+      };
+    });
     setDirty(true);
   };
 
@@ -553,6 +613,13 @@ export default function Attendance() {
 
       <header className="sticky top-0 z-40 h-14 flex items-center justify-between px-6 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(user?.role === 'teacher' ? '/teacher-panel' : '/admin-panel')}
+            className="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="Orqaga qaytish"
+          >
+            <ArrowLeft size={16} />
+          </button>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-800 to-green-500 flex items-center justify-center shadow-md shadow-green-700/25">
             <Users size={16} className="text-white" />
           </div>
@@ -571,14 +638,6 @@ export default function Attendance() {
               </span>
             </div>
           )}
-
-          <select
-            value={selGroup?.id || ""}
-            onChange={e => { const g = groups.find(g => g.id === e.target.value); setSelGroup(g || null); }}
-            className="text-xs font-medium px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 cursor-pointer outline-none focus:ring-2 focus:ring-green-500/30"
-          >
-            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
 
           <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors">
@@ -692,7 +751,13 @@ export default function Attendance() {
         ) : !selGroup ? (
           <div className="flex flex-col items-center justify-center py-20 gap-2">
             <BookOpen size={32} className="text-gray-300 dark:text-gray-600" />
-            <p className="text-sm text-gray-400">Guruh tanlang</p>
+            <p className="text-sm text-gray-400">Guruh topilmadi</p>
+            <button
+              onClick={() => navigate(user?.role === 'teacher' ? '/teacher-panel' : '/admin-panel')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-800 to-green-500 text-white text-sm font-semibold shadow-md shadow-green-700/25 hover:opacity-90 transition-opacity mt-4"
+            >
+              <ArrowLeft size={14} /> Orqaga qaytish
+            </button>
           </div>
         ) : groupStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -802,6 +867,8 @@ export default function Attendance() {
                                     on={cell.present}
                                     onChange={() => isToday && togglePresent(s.id, ds)}
                                     disabled={!isToday}
+                                    isOwner={cell.createdBy === user?.id}
+                                    user={user}
                                   />
                                   {isChanged && (
                                     <div className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
@@ -812,7 +879,10 @@ export default function Attendance() {
                                 : isToday ? (
                                   cell.present && (
                                     <button
-                                      onClick={() => setLate(s.id, ds)}
+                                      onClick={() => {
+                                        // Bugun uchun har kim o'zgartira oladi
+                                        setLate(s.id, ds);
+                                      }}
                                       className={`text-[9px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
                                         status === "late"
                                           ? "bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"

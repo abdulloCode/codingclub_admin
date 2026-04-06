@@ -27,36 +27,33 @@ export default function TeacherGroups() {
   const mu = D ? 'rgba(245,245,247,0.5)' : 'rgba(29,29,31,0.6)';
 
   const loadGroups = async () => {
-    try {
-      setLoading(true);
-      const data = await apiService.getMyTeacherGroups();
-      let grps = [];
+  try {
+    // Token dan userId olish
+    const token = localStorage.getItem('accessToken');
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const userId = payload.userId;
+    console.log("🆔 userId:", userId);
 
-      if (Array.isArray(data)) {
-        grps = data;
-      } else if (data?.groups && Array.isArray(data.groups)) {
-        grps = data.groups;
-      } else if (data?.data && Array.isArray(data.data)) {
-        grps = data.data;
-      }
-
-      // Faqat shu o'qituvchiga tegishli guruhlarni ko'rsatish
-      const teacherId = user?.id || user?.userId;
-      if (teacherId) {
-        grps = grps.filter(group => {
-          return group.teacherId === teacherId || group.teacher?.id === teacherId;
-        });
-      }
-
-      setGroups(grps);
-    } catch (err) {
-      console.error('Guruhlarni yuklashda xatolik:', err);
-      setGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    // Barcha teacherlardan o'zimiznikini topish
+    const allTeachers = await apiService.getTeachers();
+    const arr = Array.isArray(allTeachers) 
+      ? allTeachers 
+      : allTeachers?.teachers || allTeachers?.data || [];
+    
+    const me = arr.find(t => t.userId === userId);
+    console.log("👤 My teacher profile:", me);
+    
+    if (!me) { setGroups([]); return; }
+    
+    const d = await apiService.getTeacherGroups(me.id);
+    const g = Array.isArray(d) ? d : d?.groups || d?.data || [];
+    setGroups(g);
+    console.log("✅ Groups:", g.length);
+  } catch (err) {
+    console.error("❌ Error:", err);
+    setGroups([]);
+  }
+};
   useEffect(() => {
     loadGroups();
   }, []);

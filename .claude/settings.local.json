@@ -15,7 +15,11 @@
       "Bash(rm:*)",
       "Bash(npx eslint:*)",
       "Bash(node:*)",
-      "Bash(npm start:*)"
+      "Bash(npm start:*)",
+      "Bash(npm install:*)",
+      "Bash(\"C:\\\\react-projects\\\\Codingclub\\\\README.md\")",
+      "Bash(cd:*)",
+      "Bash(ls -la *.jsx)"
     ]
   }
 }

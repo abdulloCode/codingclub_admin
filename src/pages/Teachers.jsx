@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { apiService } from "../services/api";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { apiService } from '../services/api';
 import {
   GraduationCap, Plus, Search, Edit3, Trash2,
   Mail, Phone, RefreshCw, X, Save, BookOpen,
@@ -10,7 +10,7 @@ import {
   ArrowUpRight, ShieldCheck, Eye, EyeOff,
   Code2, Database, Layers, Cpu, Palette,
   Lock, Sparkles, Zap, Star,
-} from "lucide-react";
+} from 'lucide-react';
 
 /* ─── TOKENS ─────────────────────────────────────────────────── */
 const BRAND     = "#427A43";
