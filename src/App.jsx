@@ -6,6 +6,7 @@
   import { SidebarProvider } from './contexts/SidebarContext';
   import ApiErrorBoundary from './components/ApiErrorBoundary';
   import ImageLoader from './components/ImageLoader';
+  import Student from './pages/Student';
 
   // Lazy loading for better performance
   const Login = lazy(() => import('./pages/Login'));
