@@ -6,29 +6,34 @@
   import { SidebarProvider } from './contexts/SidebarContext';
   import ApiErrorBoundary from './components/ApiErrorBoundary';
   import ImageLoader from './components/ImageLoader';
-  import Student from './pages/Student';
 
   // Lazy loading for better performance
-  const Login = lazy(() => import('./pages/Login'));
-  const Register = lazy(() => import('./pages/Register'));
-  const TeacherLogin = lazy(() => import('./pages/TeacherLogin'));
-  const TeacherRegister = lazy(() => import('./pages/TeacherRegister'));
-  const StudentLogin = lazy(() => import('./pages/StudentLogin'));
-  const Profile = lazy(() => import('./pages/Profile'));
-  const AdminPanel = lazy(() => import('./pages/AdminPanel'));
-  const Teachers = lazy(() => import('./pages/Teachers'));
-  // Student fayli o'chirilgan, ishlatilmayapti
-  const Students = lazy(() => import('./pages/Students'));
-  const Groups = lazy(() => import('./pages/Groups'));
-  const Courses = lazy(() => import('./pages/Courses'));
-  const TeacherPanel = lazy(() => import('./pages/TeacherPanel'));
-  const TeacherGroups = lazy(() => import('./pages/TeacherGroups'));
+  const Login = lazy(() => import('./pages/auth/Login'));
+  const Register = lazy(() => import('./pages/auth/Register'));
+  const TeacherLogin = lazy(() => import('./pages/teacher/TeacherLogin'));
+  const TeacherRegister = lazy(() => import('./pages/teacher/TeacherRegister'));
+  const StudentLogin = lazy(() => import('./pages/student/StudentLogin'));
+  const Profile = lazy(() => import('./pages/profile/Profile'));
+  const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
+  const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
+  const Teachers = lazy(() => import('./pages/teachers/Teachers'));
+  const StudentPanel = lazy(() => import('./pages/student/StudentPanel'));
+  const Groups = lazy(() => import('./pages/group/Groups'));
+  const Courses = lazy(() => import('./pages/courses/Courses'));
+  const TeacherPanel = lazy(() => import('./pages/teacher/TeacherPanel'));
+  const TeacherGroups = lazy(() => import('./pages/teacher/TeacherGroups'));
   const AdminLayout = lazy(() => import('./components/AdminLayout'));
   const TeacherLayout = lazy(() => import('./components/TeacherLayout'));
   const Layout = lazy(() => import('./components/Layout'));
-  const Settings = lazy(() => import('./pages/Settings'));
-  const Reports = lazy(() => import('./pages/Reports'));
-  const Attendance = lazy(() => import('./pages/Attendance'));
+  const Settings = lazy(() => import('./pages/payment/Settings'));
+  const Reports = lazy(() => import('./pages/payment/Reports'));
+  const Attendance = lazy(() => import('./pages/attendance/Attendance'));
+  const PaymentDashboard = lazy(() => import('./pages/payment/PaymentDashboard'));
+  const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
+  const TeacherPayments = lazy(() => import('./pages/teacher/TeacherPayments'));
+  const StudentPayments = lazy(() => import('./pages/student/StudentPayments'));
+  // Agar faylingiz src/pages/student/Student.jsx bo'lsa:
+const Student = lazy(() => import('./pages/student/Student.jsx'));
 
 
   const LoadingScreen = ({ message = "Yuklanmoqda..." }) => (
@@ -155,11 +160,14 @@
                       >
                         {/* AdminLayout ichidagi 'Outlet' o'rniga tushadigan sahifalar */}
                         <Route path="/admin-panel" element={<SuspenseRoute message="Dashboard yuklanmoqda..."><AdminPanel /></SuspenseRoute>} />
-                        <Route path="/students" element={<SuspenseRoute message="O'quvchilar yuklanmoqda..."><Student /></SuspenseRoute>} />
+
+                        <Route path="/student" element={<SuspenseRoute message="O'quvchi yuklanmoqda..."><Student /></SuspenseRoute>} />
                         <Route path="/teachers" element={<SuspenseRoute message="O'qituvchilar yuklanmoqda..."><Teachers /></SuspenseRoute>} />
                         <Route path="/groups" element={<SuspenseRoute message="Guruhlar yuklanmoqda..."><Groups /></SuspenseRoute>} />
                         <Route path="/courses" element={<SuspenseRoute message="Kurslar yuklanmoqda..."><Courses /></SuspenseRoute>} />
                         <Route path="/attendance" element={<SuspenseRoute message="Davomat yuklanmoqda..."><Attendance /></SuspenseRoute>} />
+                        <Route path="/payment-dashboard" element={<SuspenseRoute message="To'lov dashboard yuklanmoqda..."><PaymentDashboard /></SuspenseRoute>} />
+                        <Route path="/admin-payments" element={<SuspenseRoute message="Admin to'lovlari yuklanmoqda..."><AdminPayments /></SuspenseRoute>} />
                         <Route path="/reports" element={<SuspenseRoute message="Hisobotlar yuklanmoqda..."><Reports /></SuspenseRoute>} />
                         <Route path="/settings" element={<SuspenseRoute message="Sozlamalar yuklanmoqda..."><Settings /></SuspenseRoute>} />
                         <Route path="/profile" element={<SuspenseRoute message="Profil yuklanmoqda..."><Profile /></SuspenseRoute>} />
@@ -177,13 +185,19 @@
                         }
                       >
                         <Route path="/teacher-groups" element={<SuspenseRoute message="Guruhlarim yuklanmoqda..."><TeacherGroups /></SuspenseRoute>} />
+                        <Route path="/teacher-attendance" element={<SuspenseRoute message="Davomat yuklanmoqda..."><Attendance /></SuspenseRoute>} />
+                        <Route path="/teacher-payments" element={<SuspenseRoute message="To'lovlaringiz yuklanmoqda..."><TeacherPayments /></SuspenseRoute>} />
                         <Route path="/teacher-homework" element={<SuspenseRoute message="Topshiriqlar yuklanmoqda..."><TeacherPanel /></SuspenseRoute>} />
                         <Route path="/teacher-grading" element={<SuspenseRoute message="Baholash yuklanmoqda..."><TeacherPanel /></SuspenseRoute>} />
                         <Route path="/settings" element={<SuspenseRoute message="Sozlamalar yuklanmoqda..."><Settings /></SuspenseRoute>} />
                       </Route>
 
 
-                      <Route path="/students-panel" element={<StudentRoute><SuspenseRoute message="O'quvchi paneli yuklanmoqda..."><Students /></SuspenseRoute></StudentRoute>} />
+                      <Route path="/students-panel" element={<StudentRoute><SuspenseRoute message="O'quchi paneli yuklanmoqda..."><StudentPanel /></SuspenseRoute></StudentRoute>} />
+                      <Route path="/student-payments" element={<StudentRoute><SuspenseRoute message="To'lovlaringiz yuklanmoqda..."><StudentPayments /></SuspenseRoute></StudentRoute>} />
+
+                      {/* Admin students management */}
+                      <Route path="/admin-students" element={<AdminRoute><SuspenseRoute message="O'quvchilar yuklanmoqda..."><AdminStudents /></SuspenseRoute></AdminRoute>} />
 
                       {/* Redirectlar */}
                       <Route path="/" element={<Navigate to="/login" />} />

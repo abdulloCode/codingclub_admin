@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import ImageLoader, { SmallImageLoader } from '../components/ImageLoader';
+import { useAuth } from '../../contexts/AuthContext';
+import ImageLoader, { SmallImageLoader } from '../../components/ImageLoader';
 import { Calendar, User, Phone, Mail, Lock, Edit2, Save, X, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 
 const roleColors = {

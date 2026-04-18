@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { apiService } from '../services/api';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { apiService } from '../../services/api';
 import {
   BookOpen, Plus, Search, Edit3, Trash2,
   Clock, CheckCircle, X, Save,

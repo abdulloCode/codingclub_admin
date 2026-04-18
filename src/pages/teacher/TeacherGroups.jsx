@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { apiService } from '../services/api';
-import ImageLoader from '../components/ImageLoader';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { apiService } from '../../services/api';
+import ImageLoader from '../../components/ImageLoader';
 import {
   Users, BookOpen, Clock, Calendar, Plus, ChevronRight,
   RotateCw, Layers, CheckCircle, AlertCircle, Search

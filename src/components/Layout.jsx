@@ -1,13 +1,14 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
-import Profile from '../pages/Profile';
-import Settings from '../pages/Settings';
-import Reports from '../pages/Reports';
-import Teachers from '../pages/Teachers';
-import Student from '../pages/Student';
-import Groups from '../pages/Groups';
-import Courses from '../pages/Courses';
-import AdminPanel from '../pages/AdminPanel';
+import Profile from '../pages/profile/Profile';
+import Settings from '../pages/payment/Settings';
+import Reports from '../pages/payment/Reports';
+import Teachers from '../pages/teachers/Teachers';
+import StudentPanel from '../pages/student/StudentPanel';
+import Groups from '../pages/group/Groups';
+import Courses from '../pages/courses/Courses';
+import AdminPanel from '../pages/admin/AdminPanel';
+import Student from '../pages/student/Student';
 
 export default function Layout() {
   const location = useLocation();
@@ -18,7 +19,7 @@ export default function Layout() {
       return <Profile />;
     } else if (path.startsWith('/teachers')) {
       return <Teachers />;
-    } else if (path.startsWith('/students')) {
+    } else if (path.startsWith('/student')) {
       return <Student />;
     } else if (path.startsWith('/groups')) {
       return <Groups />;

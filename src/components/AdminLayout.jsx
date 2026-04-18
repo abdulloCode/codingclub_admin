@@ -95,12 +95,12 @@ const STYLES = `
 
 const NAV_LINKS = [
   { icon: LayoutDashboard, label: 'Dashboard',      path: '/admin-panel' },
-  { icon: GraduationCap,   label: "O'quvchilar",    path: '/students'    },
+  { icon: GraduationCap,   label: "O'quvchilar",    path: '/student'    },
   { icon: Users,           label: "O'qituvchilar",  path: '/teachers'    },
   { icon: Layers,          label: 'Guruhlar',       path: '/groups'      },
   { icon: BookOpen,        label: 'Kurslar',        path: '/courses'     },
   { icon: ClipboardList,   label: 'Davomat',        path: '/attendance'  },
-  { icon: CreditCard,      label: "To'lovlar",      path: '/payments'    },
+  { icon: BarChart3,       label: "To'lovlar",      path: '/admin-payments' },
 ];
 
 export default function AdminLayout() {

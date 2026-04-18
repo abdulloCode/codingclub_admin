@@ -19,7 +19,27 @@
       "Bash(npm install:*)",
       "Bash(\"C:\\\\react-projects\\\\Codingclub\\\\README.md\")",
       "Bash(cd:*)",
-      "Bash(ls -la *.jsx)"
+      "Bash(ls -la *.jsx)",
+      "Bash(find /c/react-projects/Codingclub/src -type d -not -path */node_modules/*)",
+      "Bash(mv TeacherPanel.jsx teacher/)",
+      "Bash(mv TeacherGroups.jsx teacher/)",
+      "Bash(mv TeacherLogin.jsx teacher/)",
+      "Bash(mv TeacherRegister.jsx teacher/)",
+      "Bash(mv Student.jsx student/)",
+      "Bash(mv Students.jsx student/)",
+      "Bash(mv StudentLogin.jsx student/)",
+      "Bash(mv Settings.jsx payment/)",
+      "Bash(mv Reports.jsx payment/)",
+      "Bash(mv Attendance.jsx attendance/)",
+      "Bash(mv Courses.jsx courses/)",
+      "Bash(mv Teachers.jsx teachers/)",
+      "Bash(mv Profile.jsx profile/)",
+      "Bash(mv Login.jsx auth/)",
+      "Bash(mv Register.jsx auth/)",
+      "Bash(for dir:*)",
+      "Bash(do echo:*)",
+      "Read(//c/react-projects/Codingclub/src/pages/**)",
+      "Bash(grep -n '`' \"C:\\\\react-projects\\\\Codingclub\\\\src\\\\pages\\\\teacher\\\\TeacherPanel.jsx\")"
     ]
   }
 }

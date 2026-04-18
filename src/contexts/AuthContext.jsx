@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
 
-const AuthContext = createContext(undefined);
+export const AuthContext = createContext(undefined);
 
 const VALID_ROLES = ['admin', 'teacher', 'student'];
 
@@ -10,14 +10,11 @@ function extractUserAndRole(response) {
   
   let userData = null;
   let role = null;
-
-  // Agar response null yoki undefined bo'lsa
   if (!response) {
     console.error('❌ Response is null or undefined');
     return null;
   }
 
-  // 1. response.data.user ichida
   if (response?.data?.user) {
     userData = response.data.user;
     role = response.data.user.role;
@@ -29,7 +26,7 @@ function extractUserAndRole(response) {
     role = response.user.role;
     console.log('📌 Found in response.user, role:', role);
   }
-  // 3. response.user.user ichida (nested)
+ 
   else if (response?.user?.user) {
     userData = response.user.user;
     role = response.user.user.role;

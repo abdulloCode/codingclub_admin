@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { SmallImageLoader } from '../components/ImageLoader';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { SmallImageLoader } from '../../components/ImageLoader';
 import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, User, Mail, Briefcase, Shield, CheckCircle } from 'lucide-react';
 
 const IT_SPECIALIZATIONS = [

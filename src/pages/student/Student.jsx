@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useTheme } from '../contexts/ThemeContext';
-import { apiService } from '../services/api';
-import SharedCodeEditor from '../components/SharedCodeEditor';
+import { useTheme } from '../../contexts/ThemeContext';
+import { apiService } from '../../services/api';
+
 import {
   GraduationCap, Plus, Search, Edit3, Trash2,
   Mail, Phone, RefreshCw, X, Save,

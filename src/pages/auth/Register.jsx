@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
-import { SmallImageLoader } from '../components/ImageLoader';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { SmallImageLoader } from '../../components/ImageLoader';
 import { User, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, Building2 } from 'lucide-react';
 
 export default function Register() {

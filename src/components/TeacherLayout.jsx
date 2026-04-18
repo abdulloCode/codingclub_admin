@@ -34,6 +34,8 @@ export default function TeacherLayout() {
     { icon: Layers,        label: 'Guruhlarim',     path: '/teacher-groups' },
     { icon: FileText,      label: 'Topshiriqlar',   path: '/teacher-homework' },
     { icon: CheckCircle,   label: 'Baholash',       path: '/teacher-grading' },
+    { icon: Users,         label: 'Davomat',        path: '/teacher-attendance' },
+    { icon: CreditCard,   label: "To'lovlar",     path: '/teacher-payments' },
     { icon: Settings,      label: 'Sozlamalar',     path: '/settings' },
   ];
 

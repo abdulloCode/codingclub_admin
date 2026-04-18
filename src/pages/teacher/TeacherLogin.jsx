@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { GraduationCap, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, BookOpen, Users, TrendingUp, Shield } from 'lucide-react';
 
-export default function StudentLogin() {
+export default function TeacherLogin() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
-  const { studentLogin, user, isLoading: authLoading } = useAuth();
+  const { teacherLogin, user, isLoading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({ phone: "", password: "" });
   const [error, setError] = useState("");
@@ -20,10 +20,10 @@ export default function StudentLogin() {
   useEffect(() => {
     if (authLoading || !user?.role) return;
 
-    if (user.role === 'student') {
-      navigate('/students-panel', { replace: true });
-    } else if (user.role === 'teacher') {
+    if (user.role === 'teacher') {
       navigate('/teacher-panel', { replace: true });
+    } else if (user.role === 'student') {
+      navigate('/students-panel', { replace: true });
     } else if (user.role === 'admin') {
       navigate('/admin-panel', { replace: true });
     }
@@ -52,25 +52,24 @@ export default function StudentLogin() {
     // Validatsiyadan keyin login jarayonini boshlash
     setIsLoading(true);
     try {
-      // ✅ Telefon raqamni 'email' kalitiga o'rab yuboramiz
-      // Chunki backend talaba uchun 'email' maydonini kutadi
-      console.log("🔐 Student login attempt:", { phone: formData.phone, hasPassword: !!formData.password });
-      await studentLogin(formData.phone, formData.password);
-      console.log("✅ Student login successful");
+      console.log("🔐 Teacher login attempt:", { phone: formData.phone, hasPassword: !!formData.password });
+      await teacherLogin(formData.phone, formData.password);
+      console.log("✅ Teacher login successful");
 
       // Muvaffaqiyatli bo'lsa, useEffect orqali redirect bo'ladi
     } catch (err) {
-      console.error("❌ Student login failed:", err);
+      console.error("❌ Teacher login failed:", err);
       setError(err.message || "Login yoki parol noto'g'ri. Iltimos, qayta urinib ko'ring.");
       // Error bo'lganda password inputga focus qilish
       setFocused("password");
       setIsLoading(false);
     }
   };
-  const G = "#10b981";
+
+  const G = "#6366f1";
   const tx = isDarkMode ? "#f5f5f7" : "#111";
   const mu = isDarkMode ? "rgba(255,255,255,0.35)" : "#9ca3af";
-  const bord = isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(16,185,129,0.12)";
+  const bord = isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.12)";
 
   const inputWrapStyle = (name) => {
     const isFoc = focused === name;
@@ -79,23 +78,24 @@ export default function StudentLogin() {
       padding: "11px 14px", borderRadius: 12,
       background: isFoc
         ? isDarkMode ? "rgba(255,255,255,0.07)" : "#fff"
-        : isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(16,185,129,0.03)",
-      border: `1px solid ${isFoc ? G : isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(16,185,129,0.15)"}`,
-      boxShadow: isFoc ? "0 0 0 3px rgba(16,185,129,0.14)" : "none",
+        : isDarkMode ? "rgba(255,255,255,0.03)" : "rgba(99,102,241,0.03)",
+      border: `1px solid ${isFoc ? G : isDarkMode ? "rgba(255,255,255,0.08)" : "rgba(99,102,241,0.15)"}`,
+      boxShadow: isFoc ? "0 0 0 3px rgba(99,102,241,0.14)" : "none",
       transition: "all .2s",
     };
   };
 
   const stats = [
-    { Icon: Users,      value: "500+", label: "O'quvchilar" },
+    { Icon: Users,      value: "50+",  label: "O'qituvchilar" },
     { Icon: BookOpen,   value: "120",  label: "Guruhlar"     },
-    { Icon: TrendingUp, value: "98%",  label: "Davomat"      },
+    { Icon: TrendingUp, value: "85%",  label: "Muvaffaqiyat"  },
   ];
+
   const features = [
-    { Icon: Users,      title: "O'z natijalaringizni ko'ring",    desc: "Baholar va progress"                },
-    { Icon: BookOpen,   title: "Darslar va materiallar",          desc: "Online darslar va resurslar"         },
-    { Icon: TrendingUp, title: "Progress tracking",              desc: "O'z progressingizni kuzating"        },
-    { Icon: Shield,     title: "Xavfsiz tizim",                  desc: "Ma'lumotlaringiz himoyalangan"       },
+    { Icon: Users,      title: "O'quvchilarni boshqaring",    desc: "Guruhlar va davomat"                  },
+    { Icon: BookOpen,   title: "Topshiriqlar va baholash",    desc: "Online baholash tizimi"               },
+    { Icon: TrendingUp, title: "Progress tracking",          desc: "O'quvchilar progressingizni kuzating"  },
+    { Icon: Shield,     title: "Xavfsiz tizim",              desc: "Ma'lumotlaringiz himoyalangan"         },
   ];
 
   return (
@@ -113,7 +113,7 @@ export default function StudentLogin() {
         .sl-fb{animation:fu .4s ease .40s both}.sl-ff{animation:fu .4s ease .46s both}
         .sl-inp:hover{transform:translateY(-1px)}
         .sl-btn{position:relative;overflow:hidden;transition:transform .22s,box-shadow .22s}
-        .sl-btn:hover{transform:translateY(-2px);box-shadow:0 14px 44px rgba(16,185,129,0.5)!important}
+        .sl-btn:hover{transform:translateY(-2px);box-shadow:0 14px 44px rgba(99,102,241,0.5)!important}
         .sl-btn:active{transform:scale(0.973)}
         .sl-arrow{transition:transform .2s}.sl-btn:hover .sl-arrow{transform:translateX(5px)}
         .sl-stat{border-radius:14px;padding:16px;transition:transform .2s}.sl-stat:hover{transform:translateY(-2px)}
@@ -125,11 +125,11 @@ export default function StudentLogin() {
         .sl-pulse{animation:sl-pulse 2s ease-in-out infinite}
       `}</style>
 
-      <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", display: "flex", background: isDarkMode ? "#070d07" : "#f3f7f3" }}>
+      <div style={{ minHeight: "100vh", position: "relative", overflow: "hidden", display: "flex", background: isDarkMode ? "#07070d" : "#f3f3f7" }}>
         {/* LEFT PANEL */}
         <div style={{ flexDirection: "column", justifyContent: "space-between", width: "48%", padding: "48px 52px", position: "relative", zIndex: 10, borderRight: `1px solid ${bord}`, overflowY: "auto" }} className="sl-left">
           <div className="sl-lp1" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 13, background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 13, background: "rgba(99,102,241,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <GraduationCap size={20} color={G} />
             </div>
             <div>
@@ -139,32 +139,32 @@ export default function StudentLogin() {
           </div>
 
           <div style={{ margin: "40px 0" }}>
-            <div className="sl-lp2" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", borderRadius: 99, marginBottom: 20, background: isDarkMode ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.08)", border: `1px solid ${isDarkMode ? "rgba(16,185,129,0.28)" : "rgba(16,185,129,0.18)"}` }}>
+            <div className="sl-lp2" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 12px", borderRadius: 99, marginBottom: 20, background: isDarkMode ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)", border: `1px solid ${isDarkMode ? "rgba(99,102,241,0.28)" : "rgba(99,102,241,0.18)"}` }}>
               <span className="sl-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: G, display: "inline-block" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: G }}>O'quvchi kirish — faol</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: G }}>O'qituvchi kirish — faol</span>
             </div>
 
             {/* Xavfsizlik ogohlantirishi */}
-            <div style={{ padding: "12px 16px", borderRadius: 12, marginBottom: 24, background: isDarkMode ? "rgba(16,185,129,0.08)" : "rgba(16,185,129,0.06)", border: `1px solid ${isDarkMode ? "rgba(16,185,129,0.18)" : "rgba(16,185,129,0.14)"}` }}>
+            <div style={{ padding: "12px 16px", borderRadius: 12, marginBottom: 24, background: isDarkMode ? "rgba(99,102,241,0.08)" : "rgba(99,102,241,0.06)", border: `1px solid ${isDarkMode ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.14)"}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <Shield size={13} color={G} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: G }}>Faqat o'quvchilar uchun</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: G }}>Faqat o'qituvchilar uchun</span>
               </div>
-              <p style={{ fontSize: 12, color: mu, lineHeight: 1.5 }}>Admin yoki o'qituvchi hisob bilan kirish rad etiladi.</p>
+              <p style={{ fontSize: 12, color: mu, lineHeight: 1.5 }}>Admin yoki o'quvchi hisob bilan kirish rad etiladi.</p>
             </div>
 
             <h2 className="sl-lp3" style={{ fontSize: 34, fontWeight: 800, lineHeight: 1.12, letterSpacing: "-0.02em", marginBottom: 14, color: tx }}>
-              O'quvchilar<br />
+              O'qituvchilar<br />
               <span style={{ color: G }}>Boshqaruv Paneli</span><br />
-              <span style={{ fontWeight: 300, fontSize: 26, color: isDarkMode ? "rgba(255,255,255,0.28)" : "#c0c0c0" }}>O'zingizni kuzating</span>
+              <span style={{ fontWeight: 300, fontSize: 26, color: isDarkMode ? "rgba(255,255,255,0.28)" : "#c0c0c0" }}>Darslarni boshqaring</span>
             </h2>
             <p className="sl-lp3" style={{ fontSize: 13.5, lineHeight: 1.7, marginBottom: 32, maxWidth: 290, color: mu }}>
-              Baholaringiz, darslaringiz va progressingizni bitta qulay tizimdan kuzating.
+              Guruhlaringiz, topshiriqlaringiz va o'quvchilaringizni bitta qulay tizimdan boshqaring.
             </p>
 
             <div className="sl-lp4" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 32 }}>
               {stats.map(({ Icon, value, label }) => (
-                <div key={label} className="sl-stat" style={{ background: isDarkMode ? "rgba(16,185,129,0.09)" : "rgba(16,185,129,0.06)", border: `1px solid ${isDarkMode ? "rgba(16,185,129,0.16)" : "rgba(16,185,129,0.12)"}` }}>
+                <div key={label} className="sl-stat" style={{ background: isDarkMode ? "rgba(99,102,241,0.09)" : "rgba(99,102,241,0.06)", border: `1px solid ${isDarkMode ? "rgba(99,102,241,0.16)" : "rgba(99,102,241,0.12)"}` }}>
                   <Icon size={15} color={G} style={{ marginBottom: 8 }} />
                   <p style={{ fontSize: 20, fontWeight: 800, color: tx }}>{value}</p>
                   <p style={{ fontSize: 11, marginTop: 2, color: mu }}>{label}</p>
@@ -174,8 +174,8 @@ export default function StudentLogin() {
 
             <div className="sl-lp5">
               {features.map(({ Icon, title, desc }, i) => (
-                <div key={i} className="sl-feat" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(16,185,129,0.08)" }}>
-                  <div className="sl-feat-icon" style={{ background: isDarkMode ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.08)" }}>
+                <div key={i} className="sl-feat" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.08)" }}>
+                  <div className="sl-feat-icon" style={{ background: isDarkMode ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.08)" }}>
                     <Icon size={15} color={G} />
                   </div>
                   <div>
@@ -193,27 +193,27 @@ export default function StudentLogin() {
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, position: "relative", zIndex: 10 }}>
           <div style={{ width: "100%", maxWidth: 400 }}>
             <div className="sl-lp1 sl-mobile-logo" style={{ alignItems: "center", gap: 10, marginBottom: 32 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 11, background: "rgba(16,185,129,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 36, height: 36, borderRadius: 11, background: "rgba(99,102,241,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <GraduationCap size={18} color={G} />
               </div>
               <div>
                 <p style={{ fontSize: 15, fontWeight: 700, color: tx, lineHeight: 1 }}>Codingclub</p>
-                <p style={{ fontSize: 10, marginTop: 1, color: mu }}>O'quvchi Boshqaruv Tizimi</p>
+                <p style={{ fontSize: 10, marginTop: 1, color: mu }}>O'qituvchi Boshqaruv Tizimi</p>
               </div>
             </div>
 
-            <div className="sl-card" style={{ borderRadius: 22, padding: "32px 32px 28px", background: isDarkMode ? "rgba(255,255,255,0.03)" : "#ffffff", border: `1px solid ${bord}`, boxShadow: isDarkMode ? "0 24px 80px rgba(0,0,0,0.70)" : "0 8px 48px rgba(16,185,129,0.10),inset 0 1px 0 rgba(255,255,255,1)" }}>
+            <div className="sl-card" style={{ borderRadius: 22, padding: "32px 32px 28px", background: isDarkMode ? "rgba(255,255,255,0.03)" : "#ffffff", border: `1px solid ${bord}`, boxShadow: isDarkMode ? "0 24px 80px rgba(0,0,0,0.70)" : "0 8px 48px rgba(99,102,241,0.10),inset 0 1px 0 rgba(255,255,255,1)" }}>
               <div className="sl-lp1" style={{ marginBottom: 28 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(16,185,129,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(99,102,241,0.10)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <GraduationCap size={14} color={G} />
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: G, letterSpacing: "0.05em", background: "rgba(16,185,129,0.10)", padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(16,185,129,0.20)" }}>
-                    FAQAT O'QUVCHILAR
+                  <span style={{ fontSize: 11, fontWeight: 700, color: G, letterSpacing: "0.05em", background: "rgba(99,102,241,0.10)", padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(99,102,241,0.20)" }}>
+                    FAQAT O'QITUVCHILAR
                   </span>
                 </div>
-                <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: tx, marginBottom: 5 }}>O'quvchi kirish</h1>
-                <p style={{ fontSize: 13, color: mu, lineHeight: 1.6 }}>Admin yoki o'qituvchi hisob bilan kirish rad etiladi</p>
+                <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: tx, marginBottom: 5 }}>O'qituvchi kirish</h1>
+                <p style={{ fontSize: 13, color: mu, lineHeight: 1.6 }}>Admin yoki o'quvchi hisob bilan kirish rad etiladi</p>
               </div>
 
               {error && (
@@ -262,36 +262,36 @@ export default function StudentLogin() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <input type="checkbox" id="remember-s" style={{ accentColor: G, width: 16, height: 16, cursor: "pointer" }} />
-                  <label htmlFor="remember-s" style={{ fontSize: 13, color: mu, cursor: "pointer", userSelect: "none" }}>Eslab qolish</label>
+                  <input type="checkbox" id="remember-t" style={{ accentColor: G, width: 16, height: 16, cursor: "pointer" }} />
+                  <label htmlFor="remember-t" style={{ fontSize: 13, color: mu, cursor: "pointer", userSelect: "none" }}>Eslab qolish</label>
                 </div>
 
                 <div className="sl-fb">
                   <button
                     type="submit" disabled={isLoading} className="sl-btn"
-                    style={{ width: "100%", padding: "13px", borderRadius: 13, border: "none", cursor: isLoading ? "not-allowed" : "pointer", background: `linear-gradient(135deg,${G} 0%,#059669 100%)`, boxShadow: "0 4px 20px rgba(16,185,129,0.40),inset 0 1px 0 rgba(255,255,255,0.15)", fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: isLoading ? .65 : 1 }}
+                    style={{ width: "100%", padding: "13px", borderRadius: 13, border: "none", cursor: isLoading ? "not-allowed" : "pointer", background: `linear-gradient(135deg,${G} 0%,#4f46e5 100%)`, boxShadow: "0 4px 20px rgba(99,102,241,0.40),inset 0 1px 0 rgba(255,255,255,0.15)", fontSize: 14, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: isLoading ? .65 : 1 }}
                   >
                     {isLoading ? (
                       <><div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "sl-spin .8s linear infinite" }} /> Kirilmoqda...</>
                     ) : (
-                      <>O'quvchi sifatida kirish <ArrowRight size={15} className="sl-arrow" /></>
+                      <>O'qituvchi sifatida kirish <ArrowRight size={15} className="sl-arrow" /></>
                     )}
                   </button>
                 </div>
               </form>
 
               <div className="sl-ff" style={{ display: "flex", alignItems: "center", gap: 14, margin: "22px 0" }}>
-                <div style={{ flex: 1, height: 1, background: isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(16,185,129,0.10)" }} />
+                <div style={{ flex: 1, height: 1, background: isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.10)" }} />
                 <span style={{ fontSize: 11, color: mu }}>boshqa kirish</span>
-                <div style={{ flex: 1, height: 1, background: isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(16,185,129,0.10)" }} />
+                <div style={{ flex: 1, height: 1, background: isDarkMode ? "rgba(255,255,255,0.06)" : "rgba(99,102,241,0.10)" }} />
               </div>
 
               <div className="sl-ff" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <a href="/login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, border: `1px solid rgba(16,185,129,0.15)`, background: isDarkMode ? "rgba(16,185,129,0.06)" : "rgba(16,185,129,0.04)", textDecoration: "none", fontSize: 12, fontWeight: 600, color: G }}>
+                <a href="/login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, border: `1px solid rgba(99,102,241,0.15)`, background: isDarkMode ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.04)", textDecoration: "none", fontSize: 12, fontWeight: 600, color: G }}>
                   <Shield size={13} /> Admin kirish
                 </a>
-                <a href="/teacher-login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, border: `1px solid rgba(16,185,129,0.15)`, background: isDarkMode ? "rgba(16,185,129,0.06)" : "rgba(16,185,129,0.04)", textDecoration: "none", fontSize: 12, fontWeight: 600, color: G }}>
-                  <GraduationCap size={13} /> O'qituvchi kirish
+                <a href="/student-login" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px", borderRadius: 10, border: `1px solid rgba(99,102,241,0.15)`, background: isDarkMode ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.04)", textDecoration: "none", fontSize: 12, fontWeight: 600, color: G }}>
+                  <GraduationCap size={13} /> O'quvchi kirish
                 </a>
               </div>
             </div>

@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../services/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://blog-mrabdunozir-uz.onrender.com';
-
 export function useApiHealth() {
   const [isHealthy, setIsHealthy] = useState(null);
   const [lastChecked, setLastChecked] = useState(null);
@@ -15,39 +13,16 @@ export function useApiHealth() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/health`, {
-          method: 'GET',
-          signal: controller.signal,
-          mode: 'cors',
-        });
-
+        await apiService.getProfile(); // Try a lightweight call
         clearTimeout(timeoutId);
-
-        const isServerUp = response.ok || response.status < 500;
-        setIsHealthy(isServerUp);
+        setIsHealthy(true);
         setLastChecked(new Date());
-
-        return isServerUp;
+        return true;
       } catch (error) {
         clearTimeout(timeoutId);
-
-        // If health endpoint doesn't exist, try a simple API call
-        if (error.name === 'AbortError') {
-          try {
-            await apiService.getProfile(); // Try a lightweight call
-            setIsHealthy(true);
-            setLastChecked(new Date());
-            return true;
-          } catch {
-            setIsHealthy(false);
-            setLastChecked(new Date());
-            return false;
-          }
-        } else {
-          setIsHealthy(false);
-          setLastChecked(new Date());
-          return false;
-        }
+        setIsHealthy(false);
+        setLastChecked(new Date());
+        return false;
       }
     } catch (error) {
       setIsHealthy(false);

@@ -4,6 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { GraduationCap, LogOut, Menu, X, Sun, Moon, LayoutDashboard, Users, Layers, BookOpen, ClipboardList, CreditCard, Settings as SettingsIcon } from 'lucide-react';
 import { useState } from 'react';
 
+
 const BRAND_COLOR = '#427A43';
 
 export default function Navbar() {
@@ -20,7 +21,7 @@ export default function Navbar() {
 
   const navLinks = [
     { icon: LayoutDashboard, path: '/admin-panel', label: 'Dashboard' },
-    { icon: Users, path: '/students', label: "O'quvchilar" },
+    { icon: Users, path: '/student', label: "O'quvchilar" },
     { icon: Users, path: '/teachers', label: "O'qituvchilar" },
     { icon: Layers, path: '/groups', label: 'Guruhlar' },
     { icon: BookOpen, path: '/courses', label: 'Kurslar' },
@@ -90,7 +91,7 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Logout Button */}
+          
               <button
                 onClick={handleLogout}
                 className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-colors"
