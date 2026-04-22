@@ -5,11 +5,10 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { apiService } from '../../services/api';
 import {
   Home, Menu, X, LogOut, User, ChevronRight,
-  RotateCw, Settings, DollarSign, BookOpen, Send,
-  Calendar, Gift,
+  RotateCw, Settings, DollarSign,
+  Calendar, Gift
 } from 'lucide-react';
 import StudentDashboardStats from './components/StudentDashboardStats';
-import StudentHomeworks from './components/StudentHomeworks';
 import StudentAttendance from './components/StudentAttendance';
 import StudentPayments from './components/StudentPayments';
 
@@ -22,15 +21,9 @@ export default function StudentPanel() {
   const [loading, setLoading] = useState(false);
   const [studentData, setStudentData] = useState(null);
   const [group, setGroup] = useState(null);
-  const [homeworks, setHomeworks] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
   const [attendance, setAttendance] = useState([]);
   const [payments, setPayments] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [selectedHomework, setSelectedHomework] = useState(null);
-  const [submissionContent, setSubmissionContent] = useState("");
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [coins, setCoins] = useState(0);
 
   // ── THEME ─────────────────────────────────────────────────
@@ -52,192 +45,109 @@ export default function StudentPanel() {
   // ── NAVIGATION ────────────────────────────────────────────
   const NAV = [
     { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "homeworks", label: "Uy vazifalari", icon: BookOpen, badge: homeworks.filter(h => !h.submitted).length || null },
-    { id: "submissions", label: "Topshiriqlarim", icon: Send, badge: submissions.filter(s => !s.graded).length || null },
     { id: "attendance", label: "Davomat", icon: Calendar },
     { id: "payments", label: "To'lovlar", icon: DollarSign },
   ];
 
-  // ── ✅ TUZATILGAN: Homeworks yuklash (submissions endpointini ishlatmaydi)
-  const loadHomeworks = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      // 1. Studentning guruhini olish
-      const grp = await apiService.getMyGroup().catch(() => null);
-
-      if (!grp?.id) {
-        setGroup(null);
-        setHomeworks([]);
-        return;
-      }
-
-      // 2. Guruhning to'liq ma'lumotlarini olish (nomi, o'qituvchisi, narxi)
-      let fullGroupData = grp;
-      try {
-        const groupDetails = await apiService.getGroup(grp.id).catch(() => null);
-        if (groupDetails) {
-          fullGroupData = groupDetails;
-        }
-      } catch (err) {
-        console.log("Guruh ma'lumotlarini olishda xatolik:", err);
-      }
-
-      setGroup(fullGroupData);
-
-      // 3. Barcha homeworklarni olish (submissions emas)
-      const allHomeworks = await apiService.getHomeworks().catch(() => []);
-      const homeworkList = Array.isArray(allHomeworks) ? allHomeworks : (allHomeworks?.homeworks || allHomeworks?.data || []);
-
-      // 4. Guruh ID si bo'yicha filter qilish
-      const groupHomeworks = homeworkList.filter(hw => hw.groupId === grp.id);
-
-      // 5. Studentning submissionlarini olish (agar mavjud bo'lsa)
-      let existingSubmissions = [];
-      try {
-        existingSubmissions = await apiService.getMySubmissions().catch(() => []);
-      } catch {
-        // submission endpoint ishlamasa, muammo emas
-        existingSubmissions = [];
-      }
-      const subMap = {};
-      (Array.isArray(existingSubmissions) ? existingSubmissions : []).forEach(sub => {
-        subMap[sub.homeworkId] = sub;
-      });
-
-      // 6. Homeworklarni submission holati bilan birlashtirish
-      const enrichedHomeworks = groupHomeworks.map(hw => ({
-        ...hw,
-        submitted: !!subMap[hw.id],
-        submission: subMap[hw.id] || null,
-        grade: subMap[hw.id]?.points || null,
-        graded: subMap[hw.id]?.graded || false
-      }));
-
-      setHomeworks(enrichedHomeworks);
-
-    } catch (err) {
-      console.error("loadHomeworks error:", err);
-      setHomeworks([]);
-    } finally {
-      setLoading(false);
+  // ── ✅ FIX 1: Student data yuklash (getMyStudentData orqali)
+ const loadStudentData = useCallback(async () => {
+  try {
+    const profile = await apiService.getProfile();
+    if (profile?.role === 'student') {
+      setStudentData(profile);
+      if (profile?.coins !== undefined) setCoins(profile.coins);
     }
-  }, []);
+  } catch (err) {
+    console.error("loadStudentData error:", err);
+    setStudentData(null);
+  }
+}, []);
 
-  // ── ✅ TUZATILGAN: Submissions yuklash (o'z submissionlari)
-  const loadSubmissions = useCallback(async () => {
-    try {
-      const data = await apiService.getMySubmissions().catch(() => []);
-      const subsList = Array.isArray(data) ? data : (data?.submissions || data?.data || []);
-      setSubmissions(subsList);
-    } catch (err) {
-      console.error("loadSubmissions error:", err);
-      setSubmissions([]);
+  // ── ✅ FIX 2: Group yuklash (getMyGroup orqali)
+  const loadGroup = useCallback(async () => {
+  try {
+    const res = await apiService.getMyGroups().catch(() => null);
+    
+    // Response array yoki object bo'lishi mumkin
+    const grp = Array.isArray(res) 
+      ? res[0]           // birinchi guruhni olish
+      : res?.group || res?.groups?.[0] || res;
+    
+    if (grp?.id || grp?._id) {
+      const id = grp.id || grp._id;
+      const fullGroup = await apiService.getGroup(id).catch(() => grp);
+      setGroup({ ...fullGroup, id: fullGroup.id || fullGroup._id });
+    } else {
+      setGroup(null);
     }
-  }, []);
+  } catch (err) {
+    console.error("loadGroup error:", err);
+    setGroup(null);
+  }
+}, []);
 
-  // ── ✅ TUZATILGAN: Attendance yuklash (to'g'ri endpoint)
+  // ── ✅ FIX 3: Attendance yuklash
   const loadAttendance = useCallback(async () => {
     try {
-      // studentId bilan olish (me/attendance ishlamasa)
-      const studentId = user?.id;
-      if (!studentId) return;
+      const studentId = studentData?.id || user?.id;
+      if (!studentId) {
+        setAttendance([]);
+        return;
+      }
       
-      const data = await apiService.getStudentAttendance(studentId).catch(() => []);
-      const attList = Array.isArray(data) ? data : (data?.attendance || data?.data || []);
-      setAttendance(attList);
+      // Get all attendance records
+      const allAttendance = await apiService.getAttendances().catch(() => []);
+      const attendanceList = Array.isArray(allAttendance) ? allAttendance : (allAttendance?.attendances || allAttendance?.data || []);
+      
+      // Filter for this student
+      const studentAttendance = [];
+      for (const att of attendanceList) {
+        if (att.attendanceData && Array.isArray(att.attendanceData)) {
+          const studentRecord = att.attendanceData.find(a => a.studentId === studentId);
+          if (studentRecord) {
+            studentAttendance.push({
+              id: att.id,
+              date: att.date,
+              groupId: att.groupId,
+              status: studentRecord.status,
+              ...studentRecord
+            });
+          }
+        }
+      }
+      
+      setAttendance(studentAttendance);
     } catch (err) {
       console.error("loadAttendance error:", err);
       setAttendance([]);
     }
-  }, [user?.id]);
+  }, [studentData?.id, user?.id]);
 
-  // ── ✅ TUZATILGAN: Student data yuklash (to'g'ri endpoint)
-  const loadStudentData = useCallback(async () => {
-    try {
-      // getMyStudentData ishlamasa, getStudent bilan olish
-      let data = await apiService.getMyStudentData().catch(() => null);
-      
-      if (!data) {
-        // Fallback: user id bilan olish
-        const studentId = user?.id;
-        if (studentId) {
-          data = await apiService.getStudent(studentId).catch(() => null);
-        }
-      }
-      
-      setStudentData(data);
-      
-      // Coinlarni olish (agar mavjud bo'lsa)
-      if (data?.coins !== undefined) {
-        setCoins(data.coins);
-      } else {
-        setCoins(0);
-      }
-      
-    } catch (err) {
-      console.error("loadStudentData error:", err);
-      setStudentData(null);
-    }
-  }, [user?.id]);
-
-  // ── ✅ TUZATILGAN: Payments yuklash (guruh narxini hisoblash bilan)
+  // ── ✅ FIX 6: Payments yuklash
   const loadPayments = useCallback(async () => {
     try {
-      const data = await apiService.getMyPayments().catch(() => []);
-      const paymentsList = Array.isArray(data) ? data : (data?.payments || data?.data || []);
-
-      // Guruh ma'lumotlarini hisoblash uchun olish
-      let groupPrice = 0;
-      if (group?.monthlyPrice) {
-        groupPrice = group.monthlyPrice || 0;
-      }
-
+      // ✅ Use universal getMyPayments() method
+      const paymentsData = await apiService.getMyPayments().catch(() => []);
+      const paymentsList = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || paymentsData?.data || []);
       setPayments(paymentsList);
     } catch (err) {
       console.error("loadPayments error:", err);
       setPayments([]);
     }
-  }, [group?.monthlyPrice]);
-
-  // ── Submit homework
-  const handleSubmitHomework = async () => {
-    if (!selectedHomework || !submissionContent.trim()) {
-      alert("Iltimos, javob yozing");
-      return;
-    }
-    
-    setSubmitting(true);
-    try {
-      await apiService.submitHomework(selectedHomework.id, { content: submissionContent });
-      alert("Uy vazifasi muvaffaqiyatli topshirildi!");
-      setShowSubmitModal(false);
-      setSubmissionContent("");
-      setSelectedHomework(null);
-      await loadHomeworks();
-      await loadSubmissions();
-    } catch (err) {
-      alert("Xatolik: " + err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  }, []);
 
   // ── Initial load
   useEffect(() => {
-    loadStudentData();
-    loadHomeworks();
-    loadSubmissions();
-    loadAttendance();
-    loadPayments();
-  }, [loadStudentData, loadHomeworks, loadSubmissions, loadAttendance, loadPayments]);
+  const loadAll = async () => {
+    await loadStudentData();
+    await loadGroup();
+    await loadAttendance();
+    await loadPayments();
+  };
+  loadAll();
+}, []); // ← faqat bitta marta
 
   // ── Stats
-  const totalHomeworks = homeworks.length;
-  const submittedCount = homeworks.filter(h => h.submitted).length;
-  const pendingCount = totalHomeworks - submittedCount;
-  const avgGrade = submissions.filter(s => s.graded).reduce((acc, s) => acc + (s.points || 0), 0) / (submissions.filter(s => s.graded).length || 1);
-  
   const attendanceStats = {
     total: attendance.length,
     present: attendance.filter(a => a.status === "present").length,
@@ -308,11 +218,20 @@ export default function StudentPanel() {
         <div style={{ padding: "16px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: D ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: D ? "#27272a" : "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
-              {(studentData?.user?.name || user?.name || "S")[0].toUpperCase()}
+              {(studentData?.user?.name || user?.name || "S")[0]?.toUpperCase() || "S"}
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{studentData?.user?.name || user?.name || "Talaba"}</p>
-              <p style={{ fontSize: 11, color: C.muted }}>{group?.name || "Guruh yo'q"}</p>
+              <p style={{ fontSize: 11, color: C.muted }}>
+                {group ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: C.green }}>●</span>
+                    {group.name || "Guruh"}
+                  </span>
+                ) : (
+                  <span style={{ color: C.amber }}>Guruh yo'q</span>
+                )}
+              </p>
             </div>
           </div>
         </div>
@@ -330,7 +249,7 @@ export default function StudentPanel() {
             >
               <item.icon size={16} color={active === item.id ? C.text : C.muted} />
               <span style={{ flex: 1, fontSize: 13, fontWeight: active === item.id ? 600 : 500, color: active === item.id ? C.text : C.muted }}>{item.label}</span>
-              {item.badge && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 20, background: D ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)" }}>{item.badge}</span>}
+              {item.badge > 0 && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 20, background: D ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)" }}>{item.badge}</span>}
             </button>
           ))}
         </nav>
@@ -354,7 +273,7 @@ export default function StudentPanel() {
               </div>
             )}
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: D ? "#27272a" : "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
-              {(studentData?.user?.name || user?.name || "S")[0].toUpperCase()}
+              {(studentData?.user?.name || user?.name || "S")[0]?.toUpperCase() || "S"}
             </div>
           </div>
         </header>
@@ -369,124 +288,35 @@ export default function StudentPanel() {
               {/* DASHBOARD */}
               {active === "dashboard" && (
                 <div>
-                  <StudentDashboardStats group={group} homeworks={homeworks} attendance={attendance} payments={payments} user={user} studentData={studentData} C={C} />
-                  <StudentHomeworks homeworks={homeworks} submissions={submissions} active={active} onSelectHomework={(hw) => { setSelectedHomework(hw); setShowSubmitModal(true); }} C={C} />
-                </div>
-              )}
-
-              {/* HOMEWORKS */}
-              {active === "homeworks" && (
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text }}>Uy vazifalari</h2>
-                    <p style={{ fontSize: 13, color: C.muted }}>{homeworks.length} ta vazifa</p>
-                  </div>
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {homeworks.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: 40, background: C.card, borderRadius: 12 }}>
-                        <BookOpen size={32} color={C.muted} />
-                        <p style={{ fontSize: 14, color: C.muted, marginTop: 12 }}>Hozircha uy vazifalari yo'q</p>
-                      </div>
-                    ) : (
-                      homeworks.map(hw => (
-                        <div key={hw.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <div>
-                              <p style={{ fontSize: 16, fontWeight: 600, color: C.text }}>{hw.title}</p>
-                              <p style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>{hw.description}</p>
-                              <div style={{ display: "flex", gap: 12, marginTop: 10 }}>
-                                <span style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4, color: C.muted }}><Clock size={11} /> {formatDate(hw.deadline)}</span>
-                                <span style={{ fontSize: 11, display: "flex", alignItems: "center", gap: 4, color: C.muted }}><Star size={11} /> {hw.maxPoints || 100} ball</span>
-                              </div>
-                            </div>
-                            {hw.submitted ? (
-                              <span style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, background: `${C.green}15`, color: C.green }}>✅ Topshirilgan {hw.grade ? `(${hw.grade} ball)` : ""}</span>
-                            ) : (
-                              <button onClick={() => { setSelectedHomework(hw); setShowSubmitModal(true); }} style={{ padding: "6px 16px", borderRadius: 8, background: C.blue, border: "none", fontSize: 12, color: "#fff", cursor: "pointer" }}>Topshirish</button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* SUBMISSIONS */}
-              {active === "submissions" && (
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text }}>Topshiriqlarim</h2>
-                    <p style={{ fontSize: 13, color: C.muted }}>{submissions.length} ta topshiriq</p>
-                  </div>
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {submissions.length === 0 ? (
-                      <div style={{ textAlign: "center", padding: 40, background: C.card, borderRadius: 12 }}>
-                        <Send size={32} color={C.muted} />
-                        <p style={{ fontSize: 14, color: C.muted, marginTop: 12 }}>Hali topshiriq yubormagansiz</p>
-                      </div>
-                    ) : (
-                      submissions.map(sub => (
-                        <div key={sub.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <div style={{ flex: 1 }}>
-                              <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Uy vazifasi #{sub.homeworkId?.slice(-6)}</p>
-                              <p style={{ fontSize: 12, color: C.muted, marginTop: 8 }}>{sub.content}</p>
-                              <p style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>Yuborilgan: {formatDate(sub.submittedAt)}</p>
-                            </div>
-                            {sub.graded ? (
-                              <div style={{ textAlign: "right" }}>
-                                <span style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{sub.points}</span>
-                                <span style={{ fontSize: 12, color: C.muted }}> / {sub.maxPoints || 100}</span>
-                              </div>
-                            ) : (
-                              <span style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, background: `${C.amber}15`, color: C.amber }}>⌛ Tekshirilmoqda</span>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <StudentDashboardStats
+                    group={group}
+                    attendance={attendance}
+                    payments={payments}
+                    user={user}
+                    studentData={studentData}
+                    C={C}
+                  />
                 </div>
               )}
 
               {/* ATTENDANCE */}
               {active === "attendance" && (
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text }}>Davomat</h2>
-                    <p style={{ fontSize: 13, color: C.muted }}>Jami {attendanceStats.total} kun</p>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
-                    {[
-                      { label: "Keldi", value: attendanceStats.present, color: C.green },
-                      { label: "Kechikdi", value: attendanceStats.late, color: C.amber },
-                      { label: "Kelmedi", value: attendanceStats.absent, color: C.red },
-                    ].map(stat => (
-                      <div key={stat.label} style={styles.statCard}>
-                        <p style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value}</p>
-                        <p style={{ fontSize: 12, color: C.muted }}>{stat.label}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={styles.card}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Umumiy davomat</p>
-                      <p style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{attendanceRate}%</p>
-                    </div>
-                    <div style={{ height: 8, background: D ? "#27272a" : "#e4e4e7", borderRadius: 99, overflow: "hidden" }}>
-                      <div style={{ width: `${attendanceRate}%`, height: "100%", background: C.green, borderRadius: 99 }} />
-                    </div>
-                  </div>
-                </div>
+                <StudentAttendance
+                  group={group}
+                  user={user}
+                  studentData={studentData}
+                  C={C}
+                />
               )}
 
               {/* PAYMENTS */}
               {active === "payments" && (
                 <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text }}>To'lovlar</h2>
-                    <p style={{ fontSize: 13, color: C.muted }}>Jami to'langan: {totalPaid.toLocaleString()} so'm</p>
+                  <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text }}>To'lovlar</h2>
+                      <p style={{ fontSize: 13, color: C.muted }}>Jami to'langan: {totalPaid.toLocaleString()} so'm</p>
+                    </div>
                   </div>
                   <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
                     {payments.length === 0 ? (
@@ -498,8 +328,8 @@ export default function StudentPanel() {
                       payments.map(p => (
                         <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
                           <div>
-                            <p style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{p.month} oyi uchun</p>
-                            <p style={{ fontSize: 11, color: C.muted }}>{formatDate(p.paidAt)}</p>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{p.month || "Oylik"} oyi uchun</p>
+                            <p style={{ fontSize: 11, color: C.muted }}>{formatDate(p.date || p.paidAt || p.createdAt)}</p>
                           </div>
                           <p style={{ fontSize: 16, fontWeight: 600, color: C.green }}>{p.amount?.toLocaleString()} so'm</p>
                         </div>
@@ -512,30 +342,6 @@ export default function StudentPanel() {
           )}
         </div>
       </div>
-
-      {/* Submit Modal */}
-      {showSubmitModal && selectedHomework && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-          <div style={{ background: C.card, borderRadius: 16, width: "90%", maxWidth: 500, padding: 24 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{selectedHomework.title}</h3>
-              <button onClick={() => { setShowSubmitModal(false); setSubmissionContent(""); }} style={{ background: "transparent", border: "none", cursor: "pointer", color: C.muted }}><X size={20} /></button>
-            </div>
-            <textarea
-              placeholder="Javobingizni yozing..."
-              value={submissionContent}
-              onChange={(e) => setSubmissionContent(e.target.value)}
-              style={{ width: "100%", minHeight: 150, padding: 12, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card2, color: C.text, fontSize: 13, resize: "vertical" }}
-            />
-            <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
-              <button onClick={() => { setShowSubmitModal(false); setSubmissionContent(""); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", cursor: "pointer", color: C.muted }}>Bekor qilish</button>
-              <button onClick={handleSubmitHomework} disabled={submitting} style={{ flex: 1, padding: "10px", borderRadius: 8, background: C.blue, border: "none", cursor: "pointer", color: "#fff", fontWeight: 600 }}>
-                {submitting ? "Yuborilmoqda..." : "Yuborish"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

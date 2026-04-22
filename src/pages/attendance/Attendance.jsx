@@ -62,7 +62,6 @@ function AddStudentModal({ isOpen, onClose, availableStudents, onAdd }) {
       onClick={e => e.target === e.currentTarget && handleClose()}
     >
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]">
-
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-green-700 flex items-center justify-center shadow-md shadow-green-700/30">
@@ -137,22 +136,12 @@ function AddStudentModal({ isOpen, onClose, availableStudents, onAdd }) {
 }
 
 /* ─── TOGGLE SWITCH ──────────────────────────────────────────── */
-// FIX: Toggle mantiqini to'g'irladik
-// - disabled=true: bu o'tgan kun (past day)
-// - disabled=false: bu bugun (can edit)
-// Admin har doim o'zgartira oladi
-// Teacher faqat o'zi yozgan yozuvni o'zgartira oladi
 function Toggle({ on, onChange, disabled, isOwner, user }) {
   const canEdit = !disabled || (user?.role === 'admin') || isOwner;
-
-  const handleClick = () => {
-    if (canEdit) onChange(!on);
-  };
-
   return (
     <button
       type="button"
-      onClick={handleClick}
+      onClick={() => canEdit && onChange(!on)}
       disabled={!canEdit}
       className={`relative w-10 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
         !canEdit
@@ -161,15 +150,6 @@ function Toggle({ on, onChange, disabled, isOwner, user }) {
             ? "bg-green-500 shadow-sm shadow-green-500/40 cursor-pointer"
             : "bg-red-400 shadow-sm shadow-red-400/30 cursor-pointer"
       }`}
-      title={
-        !canEdit && disabled
-          ? user?.role === 'admin'
-            ? "Admin kecha kunlarini ham o'zgartira oladi"
-            : isOwner
-              ? "Siz bu yozuvni o'zgartirgansiz"
-              : "Bu yozuvni faqat o'zgartirgan odam o'zgartira oladi"
-          : undefined
-      }
     >
       <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${
         on ? "left-5" : "left-0.5"
@@ -180,16 +160,22 @@ function Toggle({ on, onChange, disabled, isOwner, user }) {
 
 /* ─── MAIN COMPONENT ─────────────────────────────────────────── */
 export default function Attendance() {
-  const { user }     = useAuth();
+  const { user }          = useAuth();
   const { isDarkMode: D } = useTheme();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [searchParams]    = useSearchParams();
+  const navigate          = useNavigate();
 
   const [groups,        setGroups]        = useState([]);
   const [allStudents,   setAllStudents]   = useState([]);
   const [groupStudents, setGroupStudents] = useState([]);
   const [selGroup,      setSelGroup]      = useState(null);
+
+  // ─── att: { [date]: { [studentId]: { present, status, recordId, changed, createdBy } } }
+  // Backend strukturasiga mos: bir kun = bir record, ichida attendanceData[]
   const [att,           setAtt]           = useState({});
+  // dateRecordMap: { [date]: recordId } — PUT uchun kerak
+  const [dateRecordMap, setDateRecordMap] = useState({});
+
   const [loading,       setLoading]       = useState(true);
   const [saving,        setSaving]        = useState(false);
   const [toast,         setToast]         = useState(null);
@@ -198,10 +184,8 @@ export default function Attendance() {
   const [autoSave,      setAutoSave]      = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState(null);
   const [saveErrors,    setSaveErrors]    = useState([]);
-  const [userChanges,   setUserChanges]   = useState(new Set());
 
-  // FIX: Sana hisoblashni component darajasida bir marta qilamiz
-  const now = useMemo(() => new Date(), []);
+  const now        = useMemo(() => new Date(), []);
   const todayYear  = now.getFullYear();
   const todayMonth = now.getMonth();
   const todayDate  = now.getDate();
@@ -217,49 +201,27 @@ export default function Attendance() {
     [daysInMonth]
   );
 
-  // FIX: isCurrentMonth ni to'g'ri hisoblash
   const isCurrentMonth = viewYear === todayYear && viewMonth === todayMonth;
-
-  // FIX: Kun taqqoslash uchun aniq funksiyalar
-  const isToday  = (d) => isCurrentMonth && d === todayDate;
-  const isFuture = (d) => {
-    const cellDate = new Date(viewYear, viewMonth, d);
-    const today    = new Date(todayYear, todayMonth, todayDate);
-    return cellDate > today;
-  };
-  const isPast = (d) => {
-    const cellDate = new Date(viewYear, viewMonth, d);
-    const today    = new Date(todayYear, todayMonth, todayDate);
-    return cellDate < today;
-  };
+  const isToday  = d => isCurrentMonth && d === todayDate;
+  const isFuture = d => new Date(viewYear, viewMonth, d) > new Date(todayYear, todayMonth, todayDate);
+  const isPast   = d => new Date(viewYear, viewMonth, d) < new Date(todayYear, todayMonth, todayDate);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
+  // ─── INITIAL LOAD ────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
-
         let gr = [];
         if (user?.role === "teacher") {
-          const teacherGroups = await apiService.getMyTeacherGroups().catch(() => []);
-          if (Array.isArray(teacherGroups)) {
-            gr = teacherGroups;
-          } else if (teacherGroups?.groups && Array.isArray(teacherGroups.groups)) {
-            gr = teacherGroups.groups;
-          } else if (teacherGroups?.data && Array.isArray(teacherGroups.data)) {
-            gr = teacherGroups.data;
-          }
-
-          const teacherId = user?.id || user?.userId;
-          if (teacherId) {
-            gr = gr.filter(group =>
-              group.teacherId === teacherId || group.teacher?.id === teacherId
-            );
-          }
+          const raw = await apiService.getMyTeacherGroups().catch(() => []);
+          gr = Array.isArray(raw) ? raw : (raw?.groups || raw?.data || []);
+          const tid = user?.id || user?.userId;
+          if (tid) gr = gr.filter(g => g.teacherId === tid || g.teacher?.id === tid);
         } else {
           gr = norm(await apiService.getGroups());
         }
@@ -269,12 +231,9 @@ export default function Attendance() {
         setAllStudents(st);
 
         if (groupIdFromUrl) {
-          const targetGroup = gr.find(g => g.id === groupIdFromUrl);
-          if (targetGroup) {
-            setSelGroup(targetGroup);
-          } else {
-            showToast("Guruh topilmadi", "error");
-          }
+          const found = gr.find(g => g.id === groupIdFromUrl);
+          if (found) setSelGroup(found);
+          else showToast("Guruh topilmadi", "error");
         } else if (gr.length) {
           setSelGroup(gr[0]);
         }
@@ -286,82 +245,88 @@ export default function Attendance() {
     })();
   }, [user?.role]);
 
+  // ─── GURUH O'QUVCHILARI ───────────────────────────────────────
   useEffect(() => {
     if (!selGroup) { setGroupStudents([]); return; }
     (async () => {
       try {
         setLoading(true);
-        let gs = [];
+        // API: GET /api/students?groupId=xxx — cheksiz olish uchun limit katta
+        const res = await apiService.getStudentsPaginated(1, 500, { groupId: selGroup.id }).catch(() => null);
+        let gs = normSt(res);
 
-        const r1 = await apiService.getStudentsPaginated(1, 200, { groupId: selGroup.id }).catch(() => null);
-        if (r1) gs = normSt(r1);
-
-        if (!gs.length && allStudents.length) {
+        // Fallback: barcha studentlardan filter
+        if (!gs.length) {
           gs = allStudents.filter(s => s.groupId === selGroup.id);
         }
 
-        if (!gs.length) {
-          const allSt = normSt(await apiService.getStudents().catch(() => []));
-          gs = allSt.filter(s => s.groupId === selGroup.id);
-          if (allSt.length) setAllStudents(allSt);
-        }
-
-        setGroupStudents(gs.sort((a, b) =>
-          (a.user?.name || a.name || "").localeCompare(b.user?.name || b.name || "", "uz")
-        ));
+        setGroupStudents(
+          gs.sort((a, b) =>
+            (a.user?.name || a.name || "").localeCompare(b.user?.name || b.name || "", "uz")
+          )
+        );
         setAtt({});
+        setDateRecordMap({});
         setDirty(false);
       } catch (err) {
         console.error("Guruh o'quvchilari xatosi:", err);
-        setGroupStudents(
-          allStudents.filter(s => s.groupId === selGroup.id)
-            .sort((a, b) => (a.user?.name || a.name || "").localeCompare(b.user?.name || b.name || "", "uz"))
-        );
+        setGroupStudents(allStudents.filter(s => s.groupId === selGroup.id));
       } finally {
         setLoading(false);
       }
     })();
   }, [selGroup]);
 
+  // ─── DAVOMAT YUKLASH ─────────────────────────────────────────
+  // Backend: GET /api/attendance?groupId=xxx
+  // Response: [ { id, date, groupId, attendanceData: [{studentId, status}] } ]
   const loadAttendance = useCallback(async () => {
     if (!selGroup) return;
     try {
-      const raw = await apiService.getGroupAttendanceRecords(selGroup.id).catch(() => []);
-      const records = Array.isArray(raw) ? raw : (raw?.data || raw?.records || []);
-      const map = {};
+      const raw     = await apiService.getAttendances({ groupId: selGroup.id });
+      const records = Array.isArray(raw) ? raw : (raw?.attendances || raw?.data || []);
 
-      records.forEach(r => {
-        const sid  = r.studentId || r.student_id;
-        const date = r.date ? r.date.split("T")[0] : null;
-        if (!sid || !date) return;
-        if (!map[sid]) map[sid] = {};
-        map[sid][date] = {
-          present:   r.status === "present" || r.status === "late",
-          status:    r.status || "absent",
-          id:        r.id,
-          changed:   false,
-          createdBy: r.createdBy || r.teacherId || null,
-        };
+      // dateMap: { [date]: recordId }
+      const dMap = {};
+      // attMap:  { [date]: { [studentId]: { present, status, changed, createdBy } } }
+      const aMap = {};
+
+      records.forEach(record => {
+        const date = record.date ? record.date.split("T")[0] : null;
+        if (!date) return;
+
+        dMap[date] = record.id;
+        aMap[date] = aMap[date] || {};
+
+        const attendanceData = record.attendanceData || [];
+        attendanceData.forEach(item => {
+          const sid = item.studentId || item.student_id;
+          if (!sid) return;
+          aMap[date][sid] = {
+            present:   item.status === "present" || item.status === "late",
+            status:    item.status || "absent",
+            changed:   false,
+            createdBy: record.createdBy || record.teacherId || null,
+          };
+        });
       });
 
-      // FIX: O'tgan va bugungi kunlar uchun default absent yozuv qo'shamiz
+      // O'tgan va bugungi kunlar uchun default absent
       groupStudents.forEach(student => {
         days.forEach(day => {
+          if (isFuture(day)) return;
           const ds = dateStr(viewYear, viewMonth, day);
-          if (!map[student.id]) map[student.id] = {};
-          if (!map[student.id][ds] && !isFuture(day)) {
-            map[student.id][ds] = {
-              present:   false,
-              status:    "absent",
-              id:        null,
-              changed:   false,
-              createdBy: null,
+          if (!aMap[ds]) aMap[ds] = {};
+          if (!aMap[ds][student.id]) {
+            aMap[ds][student.id] = {
+              present: false, status: "absent", changed: false, createdBy: null,
             };
           }
         });
       });
 
-      setAtt(map);
+      setAtt(aMap);
+      setDateRecordMap(dMap);
       setDirty(false);
     } catch (err) {
       console.error("Davomat yuklash xatosi:", err);
@@ -371,76 +336,141 @@ export default function Attendance() {
 
   useEffect(() => { loadAttendance(); }, [loadAttendance]);
 
+  // ─── AUTO SAVE ───────────────────────────────────────────────
   useEffect(() => {
     if (!dirty || !autoSave) return;
-    const timer = setTimeout(() => { handleSave(); }, 5000);
-    return () => clearTimeout(timer);
+    const t = setTimeout(handleSave, 5000);
+    return () => clearTimeout(t);
   }, [dirty, autoSave]);
 
+  // ─── AVTOMATIK TO'LOV YARATISH ────────────────────────────────
+  const createLessonPayments = async (date, attendanceData) => {
+    try {
+      // Kunlik dars narxini hisoblash
+      const monthlyPrice = selGroup?.monthlyPrice || 0;
+      const lessonsPerMonth = selGroup?.lessonsPerMonth || 8;
+      const dailyPrice = Math.round(monthlyPrice / lessonsPerMonth);
+
+      // Faqat kelgan o'quvchilar uchun to'lov yaratish
+      const presentStudents = attendanceData.filter(s => s.status === 'present' || s.status === 'late');
+
+      for (const studentRecord of presentStudents) {
+        try {
+          // Bu o'quvchi uchun shu kun uchun allaqachon to'lov yaratilganmi?
+          const today = new Date().toISOString().split('T')[0];
+          const existingPayments = await apiService.getPayments({ studentId: studentRecord.studentId }).catch(() => []);
+          const paymentsList = Array.isArray(existingPayments) ? existingPayments : (existingPayments?.payments || []);
+
+          const alreadyPaid = paymentsList.some(p => {
+            const paymentDate = p.date || p.paidAt || p.createdAt ? new Date(p.date || p.paidAt || p.createdAt).toISOString().split('T')[0] : null;
+            return paymentDate === date && p.typeId === 'LESSON';
+          });
+
+          if (!alreadyPaid) {
+            // Avtomatik to'lov yaratish
+            await apiService.createPayment({
+              type: 'credit',
+              dk: 'credit',
+              amount: dailyPrice,
+              toWhoId: studentRecord.studentId,
+              groupId: selGroup.id,
+              typeId: 'LESSON',
+              description: `Avtomatik to'lov: ${date} kuni dars`,
+            });
+            console.log(`✅ O'quvchi ${studentRecord.studentId} uchun ${dailyPrice} so'm to'lov yaratildi`);
+          }
+        } catch (err) {
+          console.error(`O'quvchi ${studentRecord.studentId} uchun to'lov yaratishda xatolik:`, err);
+        }
+      }
+    } catch (err) {
+      console.error('Avtomatik to\'lov yaratishda xatolik:', err);
+    }
+  };
+
+  // ─── SAQLASH ─────────────────────────────────────────────────
+  // Backend: POST /api/attendance → { date, groupId, attendanceData: [{studentId, status}] }
+  //          PUT  /api/attendance/:id → { attendanceData: [{studentId, status}] }
+  // Bir kun = bitta record — barcha o'quvchilar bitta so'rovda!
   const handleSave = async () => {
     if (!selGroup) return;
     setSaving(true);
     setSaveErrors([]);
+
     try {
-      const promises = [];
-
-      groupStudents.forEach(student => {
-        days.forEach(day => {
-          const ds   = dateStr(viewYear, viewMonth, day);
-          const cell = att[student.id]?.[ds];
-
-          if (cell && (cell.changed || !cell.id)) {
-            const status  = cell.status || (cell.present ? "present" : "absent");
-            const payload = {
-              studentId: student.id,
-              groupId:   selGroup.id,
-              date:      ds,
-              status,
-              createdBy: cell.createdBy || user?.id || user?.userId || null,
-            };
-
-            if (cell.id) {
-              promises.push(
-                apiService.updateAttendance(cell.id, { status, createdBy: cell.createdBy || user?.id || user?.userId || null })
-                  .then(() => ({ success: true, studentId: student.id, date: ds }))
-                  .catch(err => ({ success: false, studentId: student.id, date: ds, error: err }))
-              );
-            } else {
-              promises.push(
-                apiService.createAttendance(payload)
-                  .then(() => ({ success: true, studentId: student.id, date: ds }))
-                  .catch(err => ({ success: false, studentId: student.id, date: ds, error: err }))
-              );
-            }
-          }
+      // Faqat o'zgargan kunlarni topamiz
+      const changedDates = new Set();
+      Object.entries(att).forEach(([date, students]) => {
+        Object.values(students).forEach(cell => {
+          if (cell.changed) changedDates.add(date);
         });
       });
 
-      if (promises.length === 0) {
-        showToast("Saqlash uchun yangi ma'lumot yo'q", "error");
+      if (changedDates.size === 0) {
+        showToast("Saqlanadigan yangi ma'lumot yo'q", "error");
         setSaving(false);
         return;
       }
 
-      const results        = await Promise.all(promises);
-      const failedSaves    = results.filter(r => !r.success);
-      const successfulSaves = results.filter(r => r.success);
+      const promises = [];
 
-      if (failedSaves.length > 0) {
-        setSaveErrors(failedSaves.map(f => `${f.studentId}: ${f.date}`));
+      changedDates.forEach(date => {
+        const students   = att[date] || {};
+        const recordId   = dateRecordMap[date];
+
+        // attendanceData: barcha o'quvchilar (faqat o'zgarganlar emas — to'liq kun yozuvi)
+        const attendanceData = groupStudents.map(student => ({
+          studentId: student.id,
+          status:    students[student.id]?.status || "absent",
+        }));
+
+        if (recordId) {
+          // Mavjud record → PUT /api/attendance/:id
+          promises.push(
+            apiService.updateAttendance(recordId, { attendanceData })
+              .then(() => ({ success: true, date, attendanceData }))
+              .catch(err => ({ success: false, date, error: err.message }))
+          );
+        } else {
+          // Yangi record → POST /api/attendance
+          promises.push(
+            apiService.createAttendance({
+              date,
+              groupId: selGroup.id,
+              attendanceData,
+            })
+              .then(() => ({ success: true, date, attendanceData }))
+              .catch(err => ({ success: false, date, error: err.message }))
+          );
+        }
+      });
+
+      const results  = await Promise.all(promises);
+      const failed   = results.filter(r => !r.success);
+      const success  = results.filter(r => r.success);
+
+      // ✅ AVTOMATIK TO'LOV YARATISH
+      if (success.length > 0) {
+        for (const result of success) {
+          await createLessonPayments(result.date, result.attendanceData);
+        }
       }
-      if (successfulSaves.length > 0) {
-        setDirty(false);
+
+      if (failed.length > 0) {
+        setSaveErrors(failed.map(f => `${f.date}: ${f.error}`));
+      }
+      if (success.length > 0) {
         setLastSavedTime(new Date().toISOString());
+        setDirty(false);
       }
 
-      if (failedSaves.length === 0) {
-        showToast(`${successfulSaves.length} ta yozuv saqlandi`);
+      if (failed.length === 0) {
+        showToast(`${success.length} kun saqlandi va to'lovlar yaratildi ✓`);
       } else {
-        showToast(`${successfulSaves.length} ta saqlandi, ${failedSaves.length} ta xatolik`, "error");
+        showToast(`${success.length} ta saqlandi, ${failed.length} ta xatolik`, "error");
       }
 
-      if (successfulSaves.length > 0) await loadAttendance();
+      if (success.length > 0) await loadAttendance();
     } catch (err) {
       showToast(err.message || "Saqlashda xatolik", "error");
     } finally {
@@ -448,56 +478,62 @@ export default function Attendance() {
     }
   };
 
+  // ─── OY BO'YICHA SAQLASH ─────────────────────────────────────
+  // Butun oy uchun: o'tgan + bugungi kunlarni bittada saqlaydi
   const handleSaveAllMonth = async () => {
     if (!selGroup) return;
     setSaving(true);
     try {
-      const records = [];
+      const promises = [];
 
-      groupStudents.forEach(student => {
-        days.forEach(day => {
-          if (isFuture(day)) return; // Kelasi kunlarni saqlamaymiz
-          const ds     = dateStr(viewYear, viewMonth, day);
-          const cell   = att[student.id]?.[ds];
-          const status = cell?.status || (cell?.present ? "present" : "absent");
-          const record = {
-            studentId: student.id,
-            groupId:   selGroup.id,
-            date:      ds,
-            status,
-            createdBy: cell?.createdBy || user?.id || user?.userId || null,
-          };
-          if (cell?.id) record.id = cell.id;
-          records.push(record);
-        });
+      days.forEach(day => {
+        if (isFuture(day)) return;
+        const date     = dateStr(viewYear, viewMonth, day);
+        const students = att[date] || {};
+        const recordId = dateRecordMap[date];
+
+        const attendanceData = groupStudents.map(student => ({
+          studentId: student.id,
+          status:    students[student.id]?.status || "absent",
+        }));
+
+        if (recordId) {
+          promises.push(
+            apiService.updateAttendance(recordId, { attendanceData })
+              .then(() => ({ success: true, date, attendanceData }))
+              .catch(err => ({ success: false, date, error: err.message }))
+          );
+        } else {
+          promises.push(
+            apiService.createAttendance({ date, groupId: selGroup.id, attendanceData })
+              .then(() => ({ success: true, date, attendanceData }))
+              .catch(err => ({ success: false, date, error: err.message }))
+          );
+        }
       });
 
-      try {
-        const createRecords = records.filter(r => !r.id);
-        const updateRecords = records.filter(r => r.id);
+      const results = await Promise.all(promises);
+      const failed  = results.filter(r => !r.success);
+      const success = results.filter(r => r.success);
 
-        if (createRecords.length > 0) await apiService.createBulkAttendance({ records: createRecords });
-        if (updateRecords.length > 0) await apiService.updateBulkAttendance({ records: updateRecords });
-
-        setDirty(false);
-        setLastSavedTime(new Date().toISOString());
-        showToast(`${records.length} ta yozuv saqlandi (oy bo'yicha)`);
-        await loadAttendance();
-      } catch (bulkErr) {
-        console.log("Bulk API ishlamadi, oddiy yo'ldan foydalanilmoqda...", bulkErr);
-
-        const promises = records.map(record =>
-          record.id
-            ? apiService.updateAttendance(record.id, { status: record.status })
-            : apiService.createAttendance(record)
-        );
-
-        await Promise.all(promises);
-        setDirty(false);
-        setLastSavedTime(new Date().toISOString());
-        showToast(`${records.length} ta yozuv saqlandi (oy bo'yicha)`);
-        await loadAttendance();
+      // ✅ AVTOMATIK TO'LOV YARATISH (OY BO'YICHA)
+      if (success.length > 0) {
+        for (const result of success) {
+          await createLessonPayments(result.date, result.attendanceData);
+        }
       }
+
+      setDirty(false);
+      setLastSavedTime(new Date().toISOString());
+
+      if (failed.length === 0) {
+        showToast(`${success.length} kun saqlandi va to'lovlar yaratildi (oy bo'yicha) ✓`);
+      } else {
+        showToast(`${success.length} ta saqlandi, ${failed.length} ta xatolik`, "error");
+        setSaveErrors(failed.map(f => `${f.date}: ${f.error}`));
+      }
+
+      await loadAttendance();
     } catch (err) {
       showToast(err.message || "Oynani saqlashda xatolik", "error");
     } finally {
@@ -505,26 +541,22 @@ export default function Attendance() {
     }
   };
 
-  // FIX: togglePresent - faqat bugun va o'tgan kunlar uchun ishlaydi
+  // ─── TOGGLE ──────────────────────────────────────────────────
   const togglePresent = (studentId, ds, dayNum) => {
-    // Admin har qanday kunni o'zgartira oladi
-    // Teacher faqat bugun yoki o'zi yozgan yozuvni
-    const cell    = att[studentId]?.[ds];
+    const cell    = att[ds]?.[studentId];
     const isOwner = cell?.createdBy === (user?.id || user?.userId);
-    const todayFlag = isToday(dayNum);
-    const pastFlag  = isPast(dayNum);
 
-    if (!todayFlag && !pastFlag) return; // Kelasi kun — o'zgartirib bo'lmaydi
-    if (pastFlag && user?.role !== 'admin' && !isOwner) return;
+    if (isFuture(dayNum)) return;
+    if (isPast(dayNum) && user?.role !== 'admin' && !isOwner) return;
 
     setAtt(prev => {
-      const old = prev[studentId]?.[ds] ?? { present: false, status: "absent", changed: false, createdBy: null };
+      const old = prev[ds]?.[studentId] ?? { present: false, status: "absent", changed: false, createdBy: null };
       const nowPresent = !old.present;
       return {
         ...prev,
-        [studentId]: {
-          ...prev[studentId],
-          [ds]: {
+        [ds]: {
+          ...prev[ds],
+          [studentId]: {
             ...old,
             present:   nowPresent,
             status:    nowPresent ? "present" : "absent",
@@ -534,17 +566,16 @@ export default function Attendance() {
         },
       };
     });
-    setUserChanges(prev => new Set([...prev, studentId]));
     setDirty(true);
   };
 
   const setLate = (studentId, ds) => {
     setAtt(prev => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [ds]: {
-          ...(prev[studentId]?.[ds] ?? { present: true, changed: false, createdBy: null }),
+      [ds]: {
+        ...prev[ds],
+        [studentId]: {
+          ...(prev[ds]?.[studentId] ?? { present: true, changed: false, createdBy: null }),
           present:   true,
           status:    "late",
           changed:   true,
@@ -552,20 +583,21 @@ export default function Attendance() {
         },
       },
     }));
-    setUserChanges(prev => new Set([...prev, studentId]));
     setDirty(true);
   };
 
+  // ─── O'QUVCHI QO'SHISH/OLIB TASHLASH ────────────────────────
   const handleAddStudent = async (studentId) => {
     try {
       await apiService.addStudentToGroup(selGroup.id, studentId);
       const s = allStudents.find(s => s.id === studentId);
-      setAllStudents(prev => prev.map(su => su.id === studentId ? { ...su, groupId: selGroup.id } : su));
-      if (s) setGroupStudents(prev =>
-        prev.some(x => x.id === studentId) ? prev
-          : [...prev, { ...s, groupId: selGroup.id }]
-              .sort((a, b) => (a.user?.name || a.name || "").localeCompare(b.user?.name || b.name || "", "uz"))
-      );
+      if (s) {
+        setGroupStudents(prev =>
+          prev.some(x => x.id === studentId) ? prev
+            : [...prev, { ...s, groupId: selGroup.id }]
+                .sort((a, b) => (a.user?.name || a.name || "").localeCompare(b.user?.name || b.name || "", "uz"))
+        );
+      }
       showToast("O'quvchi guruhga qo'shildi");
       setAddModalOpen(false);
     } catch (err) {
@@ -576,18 +608,28 @@ export default function Attendance() {
   const handleRemoveStudent = async (studentId) => {
     try {
       await apiService.removeStudentFromGroup(selGroup.id, studentId);
-      setAllStudents(prev => prev.map(s => s.id === studentId ? { ...s, groupId: null } : s));
       setGroupStudents(prev => prev.filter(s => s.id !== studentId));
-      setAtt(prev => { const n = { ...prev }; delete n[studentId]; return n; });
+      setAtt(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(date => {
+          if (next[date][studentId]) {
+            next[date] = { ...next[date] };
+            delete next[date][studentId];
+          }
+        });
+        return next;
+      });
       showToast("O'quvchi guruhdan olib tashlandi");
     } catch (err) {
       showToast(err.message || "Xatolik", "error");
     }
   };
 
+  // ─── NAVIGATSIYA ─────────────────────────────────────────────
   const prevMonth = () => viewMonth === 0  ? (setViewMonth(11), setViewYear(y => y - 1)) : setViewMonth(m => m - 1);
   const nextMonth = () => viewMonth === 11 ? (setViewMonth(0),  setViewYear(y => y + 1)) : setViewMonth(m => m + 1);
 
+  // ─── STATISTIKA ──────────────────────────────────────────────
   const groupStudentIds   = new Set(groupStudents.map(s => s.id));
   const availableStudents = allStudents.filter(s => !groupStudentIds.has(s.id));
 
@@ -596,13 +638,13 @@ export default function Attendance() {
     days.forEach(d => {
       if (isFuture(d)) return;
       totalPossible++;
-      const cell = att[s.id]?.[dateStr(viewYear, viewMonth, d)];
-      const st   = cell?.status || (cell?.present ? "present" : "absent");
-      if (st === "present" || st === "late") totalPresent++;
+      const cell = att[dateStr(viewYear, viewMonth, d)]?.[s.id];
+      if (cell?.status === "present" || cell?.status === "late") totalPresent++;
     });
   });
   const attendancePct = totalPossible > 0 ? Math.round(totalPresent / totalPossible * 100) : 0;
 
+  // ─── RENDER ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Toast msg={toast?.msg} type={toast?.type} />
@@ -614,13 +656,12 @@ export default function Attendance() {
         onAdd={handleAddStudent}
       />
 
-      {/* ─── HEADER ─── */}
+      {/* HEADER */}
       <header className="sticky top-0 z-40 h-14 flex items-center justify-between px-6 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
         <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => navigate(user?.role === 'teacher' ? '/teacher-panel' : '/admin-panel')}
             className="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="Orqaga qaytish"
           >
             <ArrowLeft size={16} />
           </button>
@@ -633,16 +674,11 @@ export default function Attendance() {
           </div>
         </div>
 
-        {/* FIX: Tugmalar bir qatorda, scroll bo'lmasin deb flex-wrap + gap ishlatildi */}
         <div className="flex items-center gap-2 flex-wrap justify-end">
-
-          {/* O'zgarishlar indikatori */}
           {dirty && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
               <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                Saqlanmagan
-              </span>
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Saqlanmagan</span>
             </div>
           )}
 
@@ -659,77 +695,56 @@ export default function Attendance() {
             </button>
           </div>
 
-          {/* Yangilash */}
-          <button
-            onClick={loadAttendance}
-            className="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-            title="Ma'lumotlarni yangilash"
-          >
+          <button onClick={loadAttendance} className="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors">
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
 
-          {/* Avtomatik saqlash */}
+          {/* Auto save toggle */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <div
               onClick={() => setAutoSave(!autoSave)}
-              className={`relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer ${
-                autoSave ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"
-              }`}
+              className={`relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer ${autoSave ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`}
             >
-              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${
-                autoSave ? "left-5" : "left-0.5"
-              }`} />
+              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${autoSave ? "left-5" : "left-0.5"}`} />
             </div>
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">Auto saqlash</span>
           </div>
 
-          {/* Oxirgi saqlangan vaqt */}
           {lastSavedTime && (
-            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
               {new Date(lastSavedTime).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
             </span>
           )}
 
-          {/* FIX: Saqlash tugmasi — faqat dirty bo'lganda ko'rinadi */}
           {dirty && (
             <button
               onClick={handleSave}
               disabled={saving}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-green-800 to-green-500 text-white text-xs font-semibold shadow-md shadow-green-700/25 hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
             >
-              {saving
-                ? <><RefreshCw size={12} className="animate-spin" /> Saqlanmoqda...</>
-                : <><Save size={12} /> Saqlash</>
-              }
+              {saving ? <><RefreshCw size={12} className="animate-spin" /> Saqlanmoqda...</> : <><Save size={12} /> Saqlash</>}
             </button>
           )}
 
-          {/* FIX: Qayta urinish tugmasi — faqat xatolik bo'lganda ko'rinadi */}
           {saveErrors.length > 0 && (
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-semibold shadow-md shadow-red-700/25 hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-red-600 to-red-500 text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
             >
-              <RefreshCw size={12} className={saving ? "animate-spin" : ""} />
-              Qayta urinish
+              <RefreshCw size={12} className={saving ? "animate-spin" : ""} /> Qayta urinish
             </button>
           )}
 
-          {/* Oynani saqlash (bulk) */}
           <button
             onClick={handleSaveAllMonth}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-700/25 hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-blue-700 to-blue-500 text-white text-xs font-semibold shadow-md hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap"
             title="Butun oyni saqlash"
           >
-            {saving
-              ? <><RefreshCw size={12} className="animate-spin" /> ...</>
-              : <><Save size={12} /> Oyni saqlash</>
-            }
+            {saving ? <><RefreshCw size={12} className="animate-spin" /> ...</> : <><Save size={12} /> Oyni saqlash</>}
           </button>
 
-          {/* O'quvchi qo'shish */}
           {selGroup && (
             <button
               onClick={() => setAddModalOpen(true)}
@@ -743,36 +758,27 @@ export default function Attendance() {
 
       <main className="max-w-screen-xl mx-auto px-6 py-5 pb-16">
 
-        {/* Xatoliklar bloki */}
+        {/* Xatoliklar */}
         {saveErrors.length > 0 && (
           <div className="mb-5 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <XCircle size={16} className="text-red-500" />
-              <span className="text-sm font-semibold text-red-700 dark:text-red-400">
-                Saqlashda xatoliklar ({saveErrors.length})
-              </span>
+              <span className="text-sm font-semibold text-red-700 dark:text-red-400">Saqlashda xatoliklar ({saveErrors.length})</span>
             </div>
             <ul className="text-xs text-red-600 dark:text-red-300 space-y-1">
-              {saveErrors.map((error, idx) => (
-                <li key={idx}>• {error}</li>
-              ))}
+              {saveErrors.map((e, i) => <li key={i}>• {e}</li>)}
             </ul>
-            <button
-              onClick={() => setSaveErrors([])}
-              className="mt-2 text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium"
-            >
-              Yopish
-            </button>
+            <button onClick={() => setSaveErrors([])} className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium">Yopish</button>
           </div>
         )}
 
-        {/* Statistika kartalar */}
+        {/* Statistika */}
         <div className="grid grid-cols-4 gap-3 mb-5">
           {[
-            { label: "O'quvchilar", val: groupStudents.length,                cls: "text-green-700 dark:text-green-400" },
-            { label: "Davomat",     val: `${attendancePct}%`,                 cls: attendancePct >= 80 ? "text-green-600" : attendancePct >= 60 ? "text-amber-600" : "text-red-500" },
+            { label: "O'quvchilar", val: groupStudents.length, cls: "text-green-700 dark:text-green-400" },
+            { label: "Davomat",     val: `${attendancePct}%`, cls: attendancePct >= 80 ? "text-green-600" : attendancePct >= 60 ? "text-amber-600" : "text-red-500" },
             { label: "Keldi",       val: `${totalPresent} / ${totalPossible}`, cls: "text-blue-600 dark:text-blue-400" },
-            { label: "Oy",          val: MONTH_NAMES[viewMonth],               cls: "text-gray-500 dark:text-gray-400 text-sm pt-1" },
+            { label: "Oy",          val: MONTH_NAMES[viewMonth], cls: "text-gray-500 dark:text-gray-400 text-sm pt-1" },
           ].map(({ label, val, cls }) => (
             <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-1 font-medium">{label}</p>
@@ -784,7 +790,7 @@ export default function Attendance() {
         {/* Asosiy kontent */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-800 to-green-500 flex items-center justify-center shadow-lg shadow-green-700/25">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-green-800 to-green-500 flex items-center justify-center shadow-lg">
               <Users size={20} className="text-white animate-spin" />
             </div>
             <p className="text-sm text-green-700 dark:text-green-400 font-medium">Yuklanmoqda...</p>
@@ -795,7 +801,7 @@ export default function Attendance() {
             <p className="text-sm text-gray-400">Guruh topilmadi</p>
             <button
               onClick={() => navigate(user?.role === 'teacher' ? '/teacher-panel' : '/admin-panel')}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-800 to-green-500 text-white text-sm font-semibold shadow-md shadow-green-700/25 hover:opacity-90 transition-opacity mt-4"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-800 to-green-500 text-white text-sm font-semibold mt-4"
             >
               <ArrowLeft size={14} /> Orqaga qaytish
             </button>
@@ -803,10 +809,10 @@ export default function Attendance() {
         ) : groupStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Users size={32} className="text-gray-300 dark:text-gray-600" />
-            <p className="text-sm text-gray-400 mb-1">Bu guruhda o'quvchi yo'q</p>
+            <p className="text-sm text-gray-400">Bu guruhda o'quvchi yo'q</p>
             <button
               onClick={() => setAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-800 to-green-500 text-white text-sm font-semibold shadow-md shadow-green-700/25 hover:opacity-90 transition-opacity"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-green-800 to-green-500 text-white text-sm font-semibold"
             >
               <UserPlus size={14} /> O'quvchi qo'shish
             </button>
@@ -826,19 +832,12 @@ export default function Attendance() {
                       const futureFlag = isFuture(d);
                       const dow        = new Date(viewYear, viewMonth, d).getDay();
                       return (
-                        <th
-                          key={d}
-                          className={`py-2 px-1 font-medium text-center min-w-[52px] whitespace-nowrap transition-colors ${
-                            todayFlag
-                              ? "text-green-700 dark:text-green-400 bg-green-50/60 dark:bg-green-900/10"
-                              : futureFlag
-                              ? "text-gray-300 dark:text-gray-700"
-                              : "text-gray-400 dark:text-gray-500"
-                          }`}
-                        >
-                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] ${
-                            todayFlag ? "bg-green-600 text-white font-semibold" : ""
-                          }`}>{d}</span>
+                        <th key={d} className={`py-2 px-1 font-medium text-center min-w-[52px] whitespace-nowrap ${
+                          todayFlag ? "text-green-700 dark:text-green-400 bg-green-50/60 dark:bg-green-900/10"
+                            : futureFlag ? "text-gray-300 dark:text-gray-700"
+                            : "text-gray-400 dark:text-gray-500"
+                        }`}>
+                          <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] ${todayFlag ? "bg-green-600 text-white font-semibold" : ""}`}>{d}</span>
                           <br />
                           <span className="text-[9px] opacity-60">{DAY_SHORT[dow]}</span>
                         </th>
@@ -853,22 +852,18 @@ export default function Attendance() {
                     days.forEach(d => {
                       if (isFuture(d)) return;
                       dCnt++;
-                      const cell = att[s.id]?.[dateStr(viewYear, viewMonth, d)];
-                      const st   = cell?.status || (cell?.present ? "present" : "absent");
-                      if (st === "present" || st === "late") pCnt++;
+                      const cell = att[dateStr(viewYear, viewMonth, d)]?.[s.id];
+                      if (cell?.status === "present" || cell?.status === "late") pCnt++;
                     });
                     const pct    = dCnt > 0 ? Math.round(pCnt / dCnt * 100) : 0;
                     const pctCls = pct >= 80 ? "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400"
                                  : pct >= 60 ? "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400"
                                  : pct > 0   ? "text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400"
-                                 : "text-gray-400 bg-gray-100 dark:bg-gray-800";
+                                 :             "text-gray-400 bg-gray-100 dark:bg-gray-800";
                     const name   = s.user?.name || s.name || "—";
 
                     return (
-                      <tr
-                        key={s.id}
-                        className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors"
-                      >
+                      <tr key={s.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
                         {/* Ism */}
                         <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 px-4 py-2.5 whitespace-nowrap">
                           <div className="flex items-center gap-2.5">
@@ -884,7 +879,6 @@ export default function Attendance() {
                         <td className="px-2 py-2.5 text-center">
                           <button
                             onClick={() => handleRemoveStudent(s.id)}
-                            title="Guruhdan olib tashlash"
                             className="w-6 h-6 rounded-md bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 flex items-center justify-center text-red-400 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
                           >
                             <Trash2 size={10} />
@@ -897,33 +891,24 @@ export default function Attendance() {
                           const futureFlag = isFuture(d);
                           const pastFlag   = isPast(d);
                           const ds         = dateStr(viewYear, viewMonth, d);
-                          const cell       = att[s.id]?.[ds] ?? { present: false, status: "absent", changed: false, createdBy: null };
+                          const cell       = att[ds]?.[s.id] ?? { present: false, status: "absent", changed: false, createdBy: null };
                           const status     = cell.status || (cell.present ? "present" : "absent");
                           const isChanged  = cell.changed;
                           const isOwner    = cell.createdBy === (user?.id || user?.userId);
 
-                          // FIX: Toggle disabled = faqat o'tgan kun (past)
-                          // bugun disabled=false, o'tgan kun disabled=true
-                          const toggleDisabled = pastFlag;
-
                           return (
-                            <td
-                              key={d}
-                              className={`py-2 px-1 text-center align-middle ${
-                                todayFlag ? "bg-green-50/40 dark:bg-green-900/5" : ""
-                              } ${isChanged ? "ring-2 ring-amber-400/50 dark:ring-amber-500/50 rounded-md" : ""}`}
-                            >
+                            <td key={d} className={`py-2 px-1 text-center align-middle ${
+                              todayFlag ? "bg-green-50/40 dark:bg-green-900/5" : ""
+                            } ${isChanged ? "ring-2 ring-amber-400/50 dark:ring-amber-500/50 rounded-md" : ""}`}>
                               {futureFlag ? (
-                                // Kelasi kunlar uchun hech narsa ko'rsatmaymiz
                                 <div className="w-10 h-5 rounded-full bg-gray-100 dark:bg-gray-800 opacity-20 mx-auto" />
                               ) : (
                                 <div className="flex flex-col items-center gap-1">
-                                  {/* FIX: Toggle onClick - to'g'ri kun raqami uzatiladi */}
                                   <div className="relative">
                                     <Toggle
                                       on={cell.present}
                                       onChange={() => togglePresent(s.id, ds, d)}
-                                      disabled={toggleDisabled}
+                                      disabled={pastFlag}
                                       isOwner={isOwner}
                                       user={user}
                                     />
@@ -932,27 +917,24 @@ export default function Attendance() {
                                     )}
                                   </div>
 
-                                  {/* Status ko'rsatish */}
                                   {todayFlag ? (
-                                    // Bugun: "Kech" tugmasi
                                     cell.present && (
                                       <button
                                         onClick={() => setLate(s.id, ds)}
                                         className={`text-[9px] font-semibold px-1.5 py-0.5 rounded transition-colors ${
                                           status === "late"
                                             ? "bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                                            : "bg-gray-100 dark:bg-gray-800 text-gray-400 hover:bg-amber-50 dark:hover:bg-amber-900/10 hover:text-amber-500"
+                                            : "bg-gray-100 dark:bg-gray-800 text-gray-400 hover:bg-amber-50 hover:text-amber-500"
                                         }`}
                                       >
                                         Kech
                                       </button>
                                     )
                                   ) : pastFlag ? (
-                                    // O'tgan kun: belgi
                                     <span className={`text-[11px] font-bold leading-none ${
                                       status === "present" ? "text-green-500"
-                                    : status === "late"    ? "text-amber-500"
-                                    :                        "text-red-400"
+                                      : status === "late"  ? "text-amber-500"
+                                      :                      "text-red-400"
                                     }`}>
                                       {status === "present" ? "✓" : status === "late" ? "~" : "✗"}
                                     </span>

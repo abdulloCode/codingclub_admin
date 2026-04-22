@@ -39,7 +39,8 @@
       "Bash(for dir:*)",
       "Bash(do echo:*)",
       "Read(//c/react-projects/Codingclub/src/pages/**)",
-      "Bash(grep -n '`' \"C:\\\\react-projects\\\\Codingclub\\\\src\\\\pages\\\\teacher\\\\TeacherPanel.jsx\")"
+      "Bash(grep -n '`' \"C:\\\\react-projects\\\\Codingclub\\\\src\\\\pages\\\\teacher\\\\TeacherPanel.jsx\")",
+      "Bash(pkill:*)"
     ]
   }
 }

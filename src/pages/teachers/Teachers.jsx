@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { apiService } from '../../services/api';
 import {
   GraduationCap, Plus, Search, Edit3, Trash2,
   Mail, Phone, RefreshCw, X, Save, BookOpen,
-  CheckCircle, XCircle, Filter,
+  CheckCircle, XCircle,
   AlertTriangle, Users, UserCheck,
-  ArrowUpRight, ShieldCheck, Eye, EyeOff,
+  ArrowUpRight, Eye, EyeOff,
   Code2, Database, Layers, Cpu, Palette,
   Lock, Sparkles, Zap, Star,
 } from 'lucide-react';
@@ -18,22 +18,22 @@ const BRAND_L   = "#5a9e5b";
 const BRAND_DIM = "#2d5630";
 
 const SPECS = [
-  { value: "Frontend Developer (React/Next.js)",    short: "Frontend",   icon: Code2,    color: "#3b82f6", pale: "rgba(59,130,246,0.10)"   },
-  { value: "Backend Developer (Node.js/Go/Python)", short: "Backend",    icon: Database, color: "#8b5cf6", pale: "rgba(139,92,246,0.10)"   },
-  { value: "Full-stack Web Developer",              short: "Full-stack", icon: Layers,   color: "#14b8a6", pale: "rgba(20,184,166,0.10)"   },
-  { value: "Mobile App Developer (Flutter/RN)",     short: "Mobile",     icon: Cpu,      color: "#f59e0b", pale: "rgba(245,158,11,0.10)"   },
-  { value: "UI/UX Designer",                        short: "UI/UX",      icon: Palette,  color: "#ec4899", pale: "rgba(236,72,153,0.10)"   },
-  { value: "Cyber Security Specialist",             short: "Security",   icon: Lock,     color: "#ef4444", pale: "rgba(239,68,68,0.10)"    },
-  { value: "Data Scientist / AI Engineer",          short: "AI/Data",    icon: Sparkles, color: "#14b8a6", pale: "rgba(20,184,166,0.10)"   },
-  { value: "DevOps Engineer",                       short: "DevOps",     icon: Zap,      color: "#6b7280", pale: "rgba(107,114,128,0.10)"  },
+  { value: "Frontend Developer (React/Next.js)",    short: "Frontend",   icon: Code2,    color: "#3b82f6", pale: "rgba(59,130,246,0.10)"  },
+  { value: "Backend Developer (Node.js/Go/Python)", short: "Backend",    icon: Database, color: "#8b5cf6", pale: "rgba(139,92,246,0.10)"  },
+  { value: "Full-stack Web Developer",              short: "Full-stack", icon: Layers,   color: "#14b8a6", pale: "rgba(20,184,166,0.10)"  },
+  { value: "Mobile App Developer (Flutter/RN)",     short: "Mobile",     icon: Cpu,      color: "#f59e0b", pale: "rgba(245,158,11,0.10)"  },
+  { value: "UI/UX Designer",                        short: "UI/UX",      icon: Palette,  color: "#ec4899", pale: "rgba(236,72,153,0.10)"  },
+  { value: "Cyber Security Specialist",             short: "Security",   icon: Lock,     color: "#ef4444", pale: "rgba(239,68,68,0.10)"   },
+  { value: "Data Scientist / AI Engineer",          short: "AI/Data",    icon: Sparkles, color: "#14b8a6", pale: "rgba(20,184,166,0.10)"  },
+  { value: "DevOps Engineer",                       short: "DevOps",     icon: Zap,      color: "#6b7280", pale: "rgba(107,114,128,0.10)" },
 ];
 const QUALS = ["Oliy ma'lumotli", "Magistr", "PhD", "Bakalavr", "O'rta maxsus"];
-const INIT  = {
+const INIT = {
   name: "", email: "", phone: "", password: "",
   specialization: SPECS[0].value,
   qualification:  QUALS[0],
   status: "active",
-  commissionPercentage: 20, // Default 20% commission
+  salaryPercentage: 20, // ✅ TO'G'RI field nomi
 };
 
 /* ─── HELPERS ────────────────────────────────────────────────── */
@@ -52,7 +52,6 @@ const GStyles = ({ D }) => (
 
     @keyframes tr-up   { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:none} }
     @keyframes tr-in   { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
-    @keyframes tr-shim { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
     @keyframes tr-spin { to{transform:rotate(360deg)} }
     @keyframes tr-blnk { 0%,100%{opacity:1} 50%{opacity:.35} }
     @keyframes tr-tst  { from{opacity:0;transform:translateY(10px) scale(.95)} to{opacity:1;transform:none} }
@@ -65,8 +64,7 @@ const GStyles = ({ D }) => (
     .tr-toast { animation: tr-tst .28s ease both; }
 
     .tr-card {
-      transition: transform .24s cubic-bezier(.34,1.56,.64,1),
-                  box-shadow .24s, border-color .18s;
+      transition: transform .24s cubic-bezier(.34,1.56,.64,1), box-shadow .24s, border-color .18s;
     }
     .tr-card:hover {
       transform: translateY(-4px) scale(1.01);
@@ -95,7 +93,6 @@ const GStyles = ({ D }) => (
     .tr-spin { animation: tr-spin .85s linear infinite; }
     .tr-blnk { animation: tr-blnk 1.8s ease-in-out infinite; }
     .tr-tab  { cursor:pointer; transition:all .18s; white-space:nowrap; }
-
     .tr-spec-btn { cursor:pointer; border:none; transition:all .18s; }
     .tr-spec-btn:hover { transform: scale(1.05) translateY(-1px); }
   `}</style>
@@ -108,12 +105,12 @@ function useCountUp(target, dur = 900) {
   useEffect(() => {
     cancelAnimationFrame(r.current);
     const s = performance.now();
-    const t = (now) => {
+    const tick = (now) => {
       const p = Math.min((now - s) / dur, 1);
       setV(Math.round((1 - Math.pow(1 - p, 3)) * target));
-      if (p < 1) r.current = requestAnimationFrame(t);
+      if (p < 1) r.current = requestAnimationFrame(tick);
     };
-    r.current = requestAnimationFrame(t);
+    r.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(r.current);
   }, [target]);
   return v;
@@ -155,9 +152,9 @@ function StatusBadge({ active }) {
       display: "inline-flex", alignItems: "center", gap: 5,
       padding: "4px 10px", borderRadius: 99,
       fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase",
-      color:       active ? "#22c55e" : "#ef4444",
-      background:  active ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
-      border:      `1px solid ${active ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
+      color:      active ? "#22c55e" : "#ef4444",
+      background: active ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)",
+      border:     `1px solid ${active ? "rgba(34,197,94,0.25)" : "rgba(239,68,68,0.25)"}`,
     }}>
       <span style={{ width: 6, height: 6, borderRadius: "50%",
                      background: active ? "#22c55e" : "#ef4444", display: "inline-block" }} />
@@ -211,79 +208,100 @@ function StatCard({ label, value, icon: Icon, color, pale, D, delay = 0 }) {
 
 /* ─── DETAIL PANEL ───────────────────────────────────────────── */
 function DetailPanel({ t, onEdit, onDelete, onClose, D }) {
-  const sp    = specOf(t.specialization);
-  const Icon  = sp.icon;
   const card  = D ? "rgba(22,22,24,0.97)" : "#fff";
   const bord  = D ? "rgba(255,255,255,0.07)" : "rgba(66,122,67,0.12)";
   const tx    = D ? "#f5f5f7" : "#1a1a1a";
   const mu    = D ? "rgba(245,245,247,0.45)" : "rgba(0,0,0,0.45)";
   const rowBg = D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.05)";
-  const rows  = [
-    { icon: Mail,        label: "Email",      val: emailOf(t) },
-    { icon: Phone,       label: "Telefon",    val: phoneOf(t) },
-    { icon: BookOpen,    label: "Malaka",     val: t.qualification },
-    { icon: Star,        label: "Tajriba",    val: t.experience },
+
+  // ✅ salaryPercentage ishlatilmoqda
+  const rows = [
+    { icon: Mail,     label: "Email",     val: emailOf(t) },
+    { icon: Phone,    label: "Telefon",   val: phoneOf(t) },
+    { icon: BookOpen, label: "Malaka",    val: t.qualification },
+    { icon: Star,     label: "Komissiya", val: `${t.salaryPercentage ?? 20}%` },
   ].filter(r => r.val);
 
   return (
-    <div style={{
-      width: 268, flexShrink: 0,
-      background: card, border: `1px solid ${bord}`,
-      borderRadius: 22, overflow: "hidden",
-      boxShadow: D ? "none" : "0 4px 24px rgba(66,122,67,0.10)",
-      position: "sticky", top: 16,
-      animation: "tr-in 0.3s ease both",
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 100,
+      background: "rgba(0,0,0,0.65)", backdropFilter: "blur(12px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      animation: "tr-in 0.25s ease both",
     }}>
-      <div style={{
-        padding: 20,
-        background: `linear-gradient(135deg,${BRAND_DIM},${BRAND_L})`,
-        position: "relative",
+      <div onClick={e => e.stopPropagation()} style={{
+        width: "100%", maxWidth: 700, borderRadius: 28,
+        background: card, border: `1px solid ${bord}`,
+        boxShadow: "0 40px 100px rgba(0,0,0,0.40)",
+        maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
-        <button className="tr-btn" onClick={onClose} style={{
-          position: "absolute", top: 12, right: 12,
-          width: 28, height: 28, borderRadius: 8,
-          background: "rgba(255,255,255,0.18)", color: "#fff",
-        }}><X size={13} /></button>
-        <Avatar name={nameOf(t)} size={50} />
-        <p style={{ fontSize: 18, color: "#fff", fontWeight: 400, lineHeight: 1.2, marginTop: 10, marginBottom: 6 }}>
-          {nameOf(t)}
-        </p>
-        <SpecBadge value={t.specialization} />
-      </div>
-      <div style={{ padding: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-          {rows.map(({ icon: Ic, label, val }) => (
-            <div key={label} style={{
-              display: "flex", alignItems: "flex-start", gap: 10,
-              padding: "9px 12px", borderRadius: 11, background: rowBg,
-            }}>
-              <div style={{ width: 26, height: 26, borderRadius: 8,
-                            background: "rgba(66,122,67,0.12)",
-                            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Ic size={11} color={BRAND} />
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 9, fontWeight: 800, color: mu, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
-                <p style={{ fontSize: 12, color: tx, fontWeight: 500, marginTop: 1,
-                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{val}</p>
-              </div>
+        <div style={{
+          padding: "24px 28px",
+          background: `linear-gradient(135deg,${BRAND_DIM},${BRAND_L})`,
+          position: "relative",
+        }}>
+          <button className="tr-btn" onClick={onClose} style={{
+            position: "absolute", top: 16, right: 16,
+            width: 36, height: 36, borderRadius: 12,
+            background: "rgba(255,255,255,0.20)",
+            color: "#fff",
+          }}>
+            <X size={16} />
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <Avatar name={nameOf(t)} size={64} />
+            <div>
+              <p style={{ fontSize: 24, color: "#fff", fontWeight: 400, lineHeight: 1.2, marginBottom: 8 }}>
+                {nameOf(t)}
+              </p>
+              <SpecBadge value={t.specialization} />
             </div>
-          ))}
+          </div>
         </div>
-        <div style={{ marginBottom: 12 }}>
-          <StatusBadge active={t.status === "active"} />
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="tr-btn" onClick={() => onEdit(t)} style={{
-            flex: 1, padding: "9px", borderRadius: 11,
-            background: "rgba(66,122,67,0.09)", border: "1px solid rgba(66,122,67,0.20)",
-            fontSize: 12, fontWeight: 700, color: BRAND,
-          }}><Edit3 size={12} /> Tahrirlash</button>
-          <button className="tr-btn" onClick={() => onDelete(t.id)} style={{
-            flex: 1, padding: "9px", borderRadius: 11,
-            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)",
-            fontSize: 12, fontWeight: 700, color: "#ef4444",
-          }}><Trash2 size={12} /> O'chirish</button>
+
+        <div style={{ padding: "24px 28px", overflowY: "auto" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+            {rows.map(({ icon: Ic, label, val }) => (
+              <div key={label} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "14px 16px", borderRadius: 14,
+                background: rowBg, border: `1px solid ${bord}`,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: "rgba(66,122,67,0.12)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Ic size={15} color={BRAND} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 800, color: mu, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{label}</p>
+                  <p style={{ fontSize: 14, color: tx, fontWeight: 600 }}>{val}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <StatusBadge active={t.status === "active"} />
+          </div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="tr-btn" onClick={() => { onEdit(t); onClose(); }} style={{
+              flex: 1, padding: "12px", borderRadius: 13,
+              background: "rgba(66,122,67,0.10)", border: `1px solid ${BRAND}30`,
+              fontSize: 13, fontWeight: 700, color: BRAND,
+            }}>
+              <Edit3 size={14} /> Tahrirlash
+            </button>
+            <button className="tr-btn" onClick={() => { onDelete(t.id); onClose(); }} style={{
+              flex: 1, padding: "12px", borderRadius: 13,
+              background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)",
+              fontSize: 13, fontWeight: 700, color: "#ef4444",
+            }}>
+              <Trash2 size={14} /> O'chirish
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -295,7 +313,6 @@ function TeacherModal({ isOpen, onClose, isEditing, form, onChange, onSubmit, sa
   const [showPass, setShowPass] = useState(false);
   if (!isOpen) return null;
 
-  const sp    = specOf(form.specialization);
   const card  = D ? "rgba(18,18,20,0.98)" : "#fff";
   const bord  = D ? "rgba(255,255,255,0.08)" : "rgba(66,122,67,0.12)";
   const tx    = D ? "#f5f5f7" : "#1a1a1a";
@@ -447,12 +464,15 @@ function TeacherModal({ isOpen, onClose, isEditing, form, onChange, onSubmit, sa
               </select>
             </div>
             <div>
+              {/* ✅ name="salaryPercentage", value={form.salaryPercentage} */}
               <label style={lbl}>Komissiya foizi (%) <span style={{ color: "#ef4444" }}>*</span></label>
               <div style={{ position: "relative" }}>
                 <Star size={13} color={mu} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
                 <input required type="number" min="0" max="100" step="1" className="tr-inp"
                        placeholder="20"
-                       name="commissionPercentage" value={form.commissionPercentage} onChange={onChange}
+                       name="salaryPercentage"
+                       value={form.salaryPercentage}
+                       onChange={onChange}
                        style={{ ...inp, paddingLeft: 34 }} />
               </div>
               <p style={{ fontSize: 10, color: mu, marginTop: 4 }}>
@@ -465,11 +485,11 @@ function TeacherModal({ isOpen, onClose, isEditing, form, onChange, onSubmit, sa
           <div>
             <label style={lbl}>Holat</label>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...inp, padding: "11px 14px" }}>
-              <span style={{ fontSize: 13, fontWeight: 700,
-                             color: form.status === "active" ? "#22c55e" : mu }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: form.status === "active" ? "#22c55e" : mu }}>
                 {form.status === "active" ? "✅ Faol" : "❌ Nofaol"}
               </span>
-              <button type="button" onClick={() => onChange({ target: { name: "status", value: form.status === "active" ? "inactive" : "active" } })}
+              <button type="button"
+                      onClick={() => onChange({ target: { name: "status", value: form.status === "active" ? "inactive" : "active" } })}
                       style={{
                         width: 44, height: 24, borderRadius: 99, border: "none", cursor: "pointer",
                         background: form.status === "active"
@@ -599,20 +619,22 @@ export default function Teachers() {
     setForm(INIT); setIsEditing(false); setFormErr(""); setIsModalOpen(true);
   }, []);
 
+  // ✅ TO'G'RI: openEdit funksiyasi to'g'ri joylashgan va salaryPercentage ishlatmoqda
   const openEdit = useCallback(t => {
     setForm({
-      id: t.id, name: nameOf(t), email: emailOf(t), phone: phoneOf(t), password: "",
+      id:             t.id,
+      name:           nameOf(t),
+      email:          emailOf(t),
+      phone:          phoneOf(t),
+      password:       "",
       specialization: t.specialization || SPECS[0].value,
       qualification:  t.qualification  || QUALS[0],
-      status: t.status || "active",
+      status:         t.status || "active",
+      salaryPercentage: t.salaryPercentage ?? 20, // ✅
     });
     setIsEditing(true); setFormErr(""); setIsModalOpen(true);
   }, []);
 
-  // ✅ TUZATILGAN: name va value ni darhol e.target dan ajratib olinadi,
-  // shunda React synthetic event pooling muammosi bo'lmaydi.
-  // Eski "prev[name] === value ? prev : ..." optimizatsiyasi o'chirildi —
-  // u keraksiz edi va input lagiga sabab bo'lardi.
   const handleChange = useCallback(e => {
     const name  = e.target.name;
     const value = e.target.value;
@@ -620,23 +642,34 @@ export default function Teachers() {
   }, []);
 
   const handleSubmit = useCallback(async e => {
-    e.preventDefault(); setFormErr("");
+    e.preventDefault();
+    setFormErr("");
+
     if (!form.name.trim())            { setFormErr("Ism kiriting"); return; }
     if (!form.email)                  { setFormErr("Email kiriting"); return; }
     if (!form.phone)                  { setFormErr("Telefon kiriting"); return; }
     if (!isEditing && !form.password) { setFormErr("Parol kiriting"); return; }
-    if (!form.commissionPercentage && form.commissionPercentage !== 0) { setFormErr("Komissiya foizini kiriting"); return; }
-    if (form.commissionPercentage < 0 || form.commissionPercentage > 100) { setFormErr("Komissiya foizi 0-100% orasida bo'lishi kerak"); return; }
 
+    // ✅ salaryPercentage validatsiyasi
+    if (form.salaryPercentage === "" || form.salaryPercentage === null || form.salaryPercentage === undefined) {
+      setFormErr("Komissiya foizini kiriting"); return;
+    }
+    if (Number(form.salaryPercentage) < 0 || Number(form.salaryPercentage) > 100) {
+      setFormErr("Komissiya foizi 0-100% orasida bo'lishi kerak"); return;
+    }
+
+    // ✅ TO'G'RI payload: server salaryPercentage kutadi
     const payload = {
-      name: form.name.trim(), email: form.email,
-      phone: form.phone.replace(/\D/g, ""),
-      specialization: form.specialization,
-      qualification:  form.qualification,
-      status: form.status,
-      commissionPercentage: parseInt(form.commissionPercentage) || 20,
+      name:             form.name.trim(),
+      email:            form.email.trim(),
+      phone:            form.phone.trim(),
+      specialization:   form.specialization,
+      qualification:    form.qualification,
+      status:           form.status,
+      salaryPercentage: Number(form.salaryPercentage) || 20, // ✅
       ...(!isEditing && { password: form.password }),
     };
+
     setSaving(true);
     try {
       if (isEditing) {
@@ -765,10 +798,10 @@ export default function Teachers() {
           <div className="tr-1" style={{
             display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 16,
           }}>
-            <StatCard label="Jami"           value={teachers.length}  icon={Users}      color={BRAND}   pale="rgba(66,122,67,0.10)"  D={D} delay={0.04} />
-            <StatCard label="Faol"           value={totalActive}      icon={UserCheck}  color="#22c55e" pale="rgba(34,197,94,0.10)"  D={D} delay={0.10} />
-            <StatCard label="Nofaol"         value={teachers.length - totalActive} icon={XCircle} color="#ef4444" pale="rgba(239,68,68,0.10)"  D={D} delay={0.16} />
-            <StatCard label="Mutaxassislik"  value={uniqueSpecs}      icon={BookOpen}   color="#f59e0b" pale="rgba(245,158,11,0.10)" D={D} delay={0.22} />
+            <StatCard label="Jami"          value={teachers.length}           icon={Users}     color={BRAND}   pale="rgba(66,122,67,0.10)"  D={D} delay={0.04} />
+            <StatCard label="Faol"          value={totalActive}               icon={UserCheck} color="#22c55e" pale="rgba(34,197,94,0.10)"  D={D} delay={0.10} />
+            <StatCard label="Nofaol"        value={teachers.length - totalActive} icon={XCircle}  color="#ef4444" pale="rgba(239,68,68,0.10)"  D={D} delay={0.16} />
+            <StatCard label="Mutaxassislik" value={uniqueSpecs}               icon={BookOpen}  color="#f59e0b" pale="rgba(245,158,11,0.10)" D={D} delay={0.22} />
           </div>
 
           {/* Filter bar */}
@@ -847,100 +880,116 @@ export default function Teachers() {
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-              {/* Cards grid */}
-              <div style={{
-                flex: 1, minWidth: 0,
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
-                gap: 12,
-              }}>
-                {filtered.map((t, i) => {
-                  const sp   = specOf(t.specialization);
-                  const Icon = sp.icon;
-                  const n    = nameOf(t);
-                  const rowBg = D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.04)";
-                  const selected = detailTeacher?.id === t.id;
-                  return (
-                    <div key={t.id} className="tr-card"
-                         onClick={() => setDetailTeacher(selected ? null : t)}
-                         style={{
-                           background: card,
-                           border: `1px solid ${selected ? "rgba(66,122,67,0.45)" : bord}`,
-                           borderRadius: 18, overflow: "hidden", cursor: "pointer",
-                           boxShadow: selected ? "0 8px 28px rgba(66,122,67,0.16)" : D ? "none" : "0 2px 14px rgba(66,122,67,0.07)",
-                           animation: `tr-up 0.5s ease ${0.04 + i * 0.04}s both`,
-                         }}>
-                      <div style={{ height: 3, background: `linear-gradient(90deg,${BRAND_DIM},${BRAND_L})` }} />
-                      <div style={{ padding: "16px 16px 12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <Avatar name={n} size={40} />
-                            <div>
-                              <p style={{ fontSize: 16, color: tx, fontWeight: 400, lineHeight: 1.2 }}>{n}</p>
-                              <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 3 }}>
-                                <Icon size={9} color={sp.color} />
-                                <span style={{ fontSize: 10, color: sp.color, fontWeight: 700 }}>{sp.short}</span>
-                              </div>
+            <div className="tr-3" style={{ background: card, border: `1px solid ${bord}`, borderRadius: 20, padding: "20px", overflow: "hidden" }}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${bord}` }}>
+                      {["№","Ism","Email","Telefon","Mutaxassislik","Komissiya","Holat","Amallar"].map((h, i) => (
+                        <th key={h} style={{
+                          padding: "12px 14px", fontWeight: 700, color: mu,
+                          fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em",
+                          textAlign: i === 7 ? "right" : "left",
+                        }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((t, idx) => {
+                      const sp = specOf(t.specialization);
+                      const Icon = sp.icon;
+                      const n = nameOf(t);
+                      const isSelected = detailTeacher?.id === t.id;
+                      return (
+                        <tr
+                          key={t.id}
+                          onClick={() => setDetailTeacher(isSelected ? null : t)}
+                          style={{
+                            borderBottom: `1px solid ${bord}`,
+                            transition: "all 0.2s",
+                            cursor: "pointer",
+                            background: isSelected ? `${BRAND}12` : "transparent",
+                          }}
+                          onMouseEnter={e => {
+                            if (!isSelected) e.currentTarget.style.background = D ? "rgba(66,122,67,0.06)" : "rgba(66,122,67,0.04)";
+                          }}
+                          onMouseLeave={e => {
+                            if (!isSelected) e.currentTarget.style.background = "transparent";
+                          }}
+                        >
+                          <td style={{ padding: "12px 14px", color: mu, fontWeight: 600 }}>{idx + 1}</td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={n} size={32} />
+                              <span style={{ fontWeight: 600, color: tx }}>{n}</span>
                             </div>
-                          </div>
-                          {isAdmin && (
-                            <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
-                              <button className="tr-btn" onClick={() => openEdit(t)} style={{
-                                width: 30, height: 30, borderRadius: 9,
-                                background: "rgba(66,122,67,0.09)", color: BRAND,
-                              }}><Edit3 size={13} /></button>
-                              <button className="tr-btn" onClick={() => setDeleteTarget(t.id)} style={{
-                                width: 30, height: 30, borderRadius: 9,
-                                background: "rgba(239,68,68,0.08)", color: "#ef4444",
-                              }}><Trash2 size={13} /></button>
+                          </td>
+                          <td style={{ padding: "12px 14px", color: mu, fontSize: 12 }}>{emailOf(t)}</td>
+                          <td style={{ padding: "12px 14px", color: mu, fontSize: 12 }}>{phoneOf(t)}</td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                              <Icon size={11} color={sp.color} />
+                              <span style={{ fontSize: 12, fontWeight: 600, color: sp.color }}>{sp.short}</span>
                             </div>
-                          )}
-                        </div>
-
-                        <div style={{ marginBottom: 10 }}>
-                          <SpecBadge value={t.specialization} />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[[Mail, emailOf(t)], [Phone, phoneOf(t)]].map(([Ic, val]) => val && val !== "—" ? (
-                            <div key={val} style={{
-                              display: "flex", alignItems: "center", gap: 7,
-                              padding: "7px 10px", borderRadius: 9, background: rowBg,
+                          </td>
+                          {/* ✅ salaryPercentage ishlatilmoqda */}
+                          <td style={{ padding: "12px 14px" }}>
+                            <span style={{
+                              padding: "4px 10px", borderRadius: 8,
+                              background: "rgba(245,158,11,0.10)",
+                              color: "#f59e0b", fontSize: 11, fontWeight: 700,
+                              border: "1px solid rgba(245,158,11,0.25)",
                             }}>
-                              <Ic size={11} color={BRAND} />
-                              <span style={{ fontSize: 12, color: mu, overflow: "hidden",
-                                             textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{val}</span>
+                              {t.salaryPercentage ?? 20}%
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <StatusBadge active={t.status === "active"} />
+                          </td>
+                          <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                              {isAdmin && (
+                                <>
+                                  <button className="tr-btn" onClick={() => openEdit(t)} style={{
+                                    padding: "6px 10px", borderRadius: 8,
+                                    background: "rgba(66,122,67,0.10)", color: BRAND,
+                                    fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${BRAND}25`,
+                                  }}>
+                                    <Edit3 size={11} />
+                                  </button>
+                                  <button className="tr-btn" onClick={() => setDeleteTarget(t.id)} style={{
+                                    padding: "6px 10px", borderRadius: 8,
+                                    background: "rgba(239,68,68,0.08)", color: "#ef4444",
+                                    fontSize: 11, fontWeight: 700,
+                                    border: "1px solid rgba(239,68,68,0.18)",
+                                  }}>
+                                    <Trash2 size={11} />
+                                  </button>
+                                </>
+                              )}
                             </div>
-                          ) : null)}
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-                          <StatusBadge active={t.status === "active"} />
-                          {t.qualification && (
-                            <span style={{ fontSize: 10, color: mu }}>{t.qualification}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-
-              {/* Detail panel */}
-              {detailTeacher && (
-                <DetailPanel
-                  t={detailTeacher}
-                  onEdit={openEdit}
-                  onDelete={setDeleteTarget}
-                  onClose={() => setDetailTeacher(null)}
-                  D={D}
-                />
-              )}
             </div>
           )}
         </div>
       </div>
+
+      {detailTeacher && (
+        <DetailPanel
+          t={detailTeacher}
+          onEdit={openEdit}
+          onDelete={id => setDeleteTarget(id)}
+          onClose={() => setDetailTeacher(null)}
+          D={D}
+        />
+      )}
 
       <TeacherModal
         isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}

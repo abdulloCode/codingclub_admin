@@ -15,6 +15,7 @@
   const StudentLogin = lazy(() => import('./pages/student/StudentLogin'));
   const Profile = lazy(() => import('./pages/profile/Profile'));
   const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
   const AdminStudents = lazy(() => import('./pages/admin/AdminStudents'));
   const Teachers = lazy(() => import('./pages/teachers/Teachers'));
   const StudentPanel = lazy(() => import('./pages/student/StudentPanel'));
@@ -32,6 +33,7 @@
   const AdminPayments = lazy(() => import('./pages/admin/AdminPayments'));
   const TeacherPayments = lazy(() => import('./pages/teacher/TeacherPayments'));
   const StudentPayments = lazy(() => import('./pages/student/StudentPayments'));
+  const UserPayment = lazy(() => import('./pages/payment/UserPayment'));
   // Agar faylingiz src/pages/student/Student.jsx bo'lsa:
 const Student = lazy(() => import('./pages/student/Student.jsx'));
 
@@ -161,7 +163,7 @@ const Student = lazy(() => import('./pages/student/Student.jsx'));
                         {/* AdminLayout ichidagi 'Outlet' o'rniga tushadigan sahifalar */}
                         <Route path="/admin-panel" element={<SuspenseRoute message="Dashboard yuklanmoqda..."><AdminPanel /></SuspenseRoute>} />
 
-                        <Route path="/student" element={<SuspenseRoute message="O'quvchi yuklanmoqda..."><Student /></SuspenseRoute>} />
+                        <Route path="/admin-students" element={<SuspenseRoute message="O'quvchi yuklanmoqda..."><Student /></SuspenseRoute>} />
                         <Route path="/teachers" element={<SuspenseRoute message="O'qituvchilar yuklanmoqda..."><Teachers /></SuspenseRoute>} />
                         <Route path="/groups" element={<SuspenseRoute message="Guruhlar yuklanmoqda..."><Groups /></SuspenseRoute>} />
                         <Route path="/courses" element={<SuspenseRoute message="Kurslar yuklanmoqda..."><Courses /></SuspenseRoute>} />
@@ -187,6 +189,7 @@ const Student = lazy(() => import('./pages/student/Student.jsx'));
                         <Route path="/teacher-groups" element={<SuspenseRoute message="Guruhlarim yuklanmoqda..."><TeacherGroups /></SuspenseRoute>} />
                         <Route path="/teacher-attendance" element={<SuspenseRoute message="Davomat yuklanmoqda..."><Attendance /></SuspenseRoute>} />
                         <Route path="/teacher-payments" element={<SuspenseRoute message="To'lovlaringiz yuklanmoqda..."><TeacherPayments /></SuspenseRoute>} />
+                        <Route path="/my-payments" element={<SuspenseRoute message="To'lovlar yuklanmoqda..."><UserPayment /></SuspenseRoute>} />
                         <Route path="/teacher-homework" element={<SuspenseRoute message="Topshiriqlar yuklanmoqda..."><TeacherPanel /></SuspenseRoute>} />
                         <Route path="/teacher-grading" element={<SuspenseRoute message="Baholash yuklanmoqda..."><TeacherPanel /></SuspenseRoute>} />
                         <Route path="/settings" element={<SuspenseRoute message="Sozlamalar yuklanmoqda..."><Settings /></SuspenseRoute>} />
@@ -195,8 +198,9 @@ const Student = lazy(() => import('./pages/student/Student.jsx'));
 
                       <Route path="/students-panel" element={<StudentRoute><SuspenseRoute message="O'quchi paneli yuklanmoqda..."><StudentPanel /></SuspenseRoute></StudentRoute>} />
                       <Route path="/student-payments" element={<StudentRoute><SuspenseRoute message="To'lovlaringiz yuklanmoqda..."><StudentPayments /></SuspenseRoute></StudentRoute>} />
+                      <Route path="/my-payments" element={<StudentRoute><SuspenseRoute message="To'lovlar yuklanmoqda..."><UserPayment /></SuspenseRoute></StudentRoute>} />
 
-                      {/* Admin students management */}
+                      {/* Admin students & teachers management */}
                       <Route path="/admin-students" element={<AdminRoute><SuspenseRoute message="O'quvchilar yuklanmoqda..."><AdminStudents /></SuspenseRoute></AdminRoute>} />
 
                       {/* Redirectlar */}

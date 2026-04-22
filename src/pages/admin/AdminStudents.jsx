@@ -656,23 +656,6 @@ export default function AdminStudents() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 7,
-              padding: "7px 12px", borderRadius: 11,
-              background: D ? "rgba(255,255,255,0.05)" : "rgba(66,122,67,0.06)",
-              border: `1px solid ${bord}`,
-            }}>
-              <Search size={13} color={mu} />
-              <input className="as-inp" placeholder="Qidirish..."
-                     value={search} onChange={e => setSearch(e.target.value)}
-                     style={{ background: "transparent", border: "none", outline: "none",
-                              fontSize: 13, color: tx, width: 150, padding: 0 }} />
-              {search && (
-                <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer" }}>
-                  <X size={12} color={mu} />
-                </button>
-              )}
-            </div>
             <button className="as-btn" onClick={fetchData} style={{
               width: 34, height: 34, borderRadius: 10,
               background: "rgba(66,122,67,0.09)", border: `1px solid ${bord}`, color: BRAND,
@@ -692,7 +675,7 @@ export default function AdminStudents() {
           </div>
         </div>
 
-        {/* ── MAIN CONTENT ── */}
+        {/* ── FULL SCREEN TABLE VIEW ── */}
         <div style={{ padding: "16px 24px 40px" }}>
 
           {/* Stats */}
@@ -779,104 +762,201 @@ export default function AdminStudents() {
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-              {/* Cards grid */}
-              <div style={{
-                flex: 1, minWidth: 0,
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))",
-                gap: 12,
-              }}>
-                {filtered.map((s, i) => {
-                  const groupName = s.groupId && groups
-                    ? groups.find(g => g.id === s.groupId)?.name || null
-                    : null;
-                  const n    = nameOf(s);
-                  const rowBg = D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.04)";
-                  const selected = detailStudent?.id === s.id;
-                  return (
-                    <div key={s.id} className="as-card"
-                         onClick={() => setDetailStudent(selected ? null : s)}
-                         style={{
-                           background: card,
-                           border: `1px solid ${selected ? "rgba(66,122,67,0.45)" : bord}`,
-                           borderRadius: 18, overflow: "hidden", cursor: "pointer",
-                           boxShadow: selected ? "0 8px 28px rgba(66,122,67,0.16)" : D ? "none" : "0 2px 14px rgba(66,122,67,0.07)",
-                           animation: `as-up 0.5s ease ${0.04 + i * 0.04}s both`,
-                         }}>
-                      <div style={{ height: 3, background: `linear-gradient(90deg,${BRAND_DIM},${BRAND_L})` }} />
-                      <div style={{ padding: "16px 16px 12px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                            <Avatar name={n} size={40} />
-                            <div>
-                              <p style={{ fontSize: 16, color: tx, fontWeight: 400, lineHeight: 1.2 }}>{n}</p>
-                              {groupName && (
-                                <p style={{ fontSize: 11, color: BRAND, fontWeight: 600, marginTop: 2 }}>
-                                  {groupName}
-                                </p>
+            <div className="as-3" style={{ background: card, border: `1px solid ${bord}`, borderRadius: 20, padding: "20px", overflow: "hidden" }}>
+              {/* Full Screen Table */}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${bord}` }}>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>№</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Ism</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Email</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Telefon</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Guruh</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Balans</th>
+                      <th style={{ padding: "12px 14px", textAlign: "left", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Holat</th>
+                      <th style={{ padding: "12px 14px", textAlign: "right", fontWeight: 700, color: mu, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Amallar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((s, idx) => {
+                      const n = nameOf(s);
+                      const groupName = s.groupId && groups
+                        ? groups.find(g => g.id === s.groupId)?.name || "—"
+                        : "—";
+                      const isSelected = detailStudent?.id === s.id;
+                      return (
+                        <tr
+                          key={s.id}
+                          onClick={() => setDetailStudent(isSelected ? null : s)}
+                          style={{
+                            borderBottom: `1px solid ${bord}`,
+                            transition: "all 0.2s",
+                            cursor: "pointer",
+                            background: isSelected ? `${BRAND}12` : "transparent",
+                          }}
+                          onMouseEnter={e => {
+                            if (!isSelected) e.currentTarget.style.background = D ? "rgba(66,122,67,0.06)" : "rgba(66,122,67,0.04)";
+                          }}
+                          onMouseLeave={e => {
+                            if (!isSelected) e.currentTarget.style.background = "transparent";
+                          }}
+                        >
+                          <td style={{ padding: "12px 14px", color: mu, fontWeight: 600 }}>{idx + 1}</td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={n} size={32} />
+                              <span style={{ fontWeight: 600, color: tx }}>{n}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px 14px", color: mu, fontSize: 12 }}>{emailOf(s)}</td>
+                          <td style={{ padding: "12px 14px", color: mu, fontSize: 12 }}>{phoneOf(s)}</td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <span style={{
+                              padding: "4px 10px", borderRadius: 8,
+                              background: groupName !== "—" ? "rgba(66,122,67,0.10)" : "transparent",
+                              color: groupName !== "—" ? BRAND : mu,
+                              fontSize: 11, fontWeight: 700,
+                              border: groupName !== "—" ? `1px solid ${BRAND}30` : "none",
+                            }}>
+                              {groupName}
+                            </span>
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <BalanceBadge balance={s.balance || 0} />
+                          </td>
+                          <td style={{ padding: "12px 14px" }}>
+                            <StatusBadge active={s.status === "active"} />
+                          </td>
+                          <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }} onClick={e => e.stopPropagation()}>
+                              {isAdmin && (
+                                <>
+                                  <button className="as-btn" onClick={() => openEdit(s)} style={{
+                                    padding: "6px 10px", borderRadius: 8,
+                                    background: "rgba(66,122,67,0.10)", color: BRAND,
+                                    fontSize: 11, fontWeight: 700,
+                                    border: `1px solid ${BRAND}25`,
+                                  }}>
+                                    <Edit3 size={11} />
+                                  </button>
+                                  <button className="as-btn" onClick={() => setDeleteTarget(s.id)} style={{
+                                    padding: "6px 10px", borderRadius: 8,
+                                    background: "rgba(239,68,68,0.08)", color: "#ef4444",
+                                    fontSize: 11, fontWeight: 700,
+                                    border: "1px solid rgba(239,68,68,0.18)",
+                                  }}>
+                                    <Trash2 size={11} />
+                                  </button>
+                                </>
                               )}
                             </div>
-                          </div>
-                          {isAdmin && (
-                            <div style={{ display: "flex", gap: 5 }} onClick={e => e.stopPropagation()}>
-                              <button className="as-btn" onClick={() => openEdit(s)} style={{
-                                width: 30, height: 30, borderRadius: 9,
-                                background: "rgba(66,122,67,0.09)", color: BRAND,
-                              }}><Edit3 size={13} /></button>
-                              <button className="as-btn" onClick={() => setDeleteTarget(s.id)} style={{
-                                width: 30, height: 30, borderRadius: 9,
-                                background: "rgba(239,68,68,0.08)", color: "#ef4444",
-                              }}><Trash2 size={13} /></button>
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ marginBottom: 10 }}>
-                          <BalanceBadge balance={s.balance || 0} />
-                        </div>
-
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[[Mail, emailOf(s)], [Phone, phoneOf(s)]].map(([Ic, val]) => val && val !== "—" ? (
-                            <div key={val} style={{
-                              display: "flex", alignItems: "center", gap: 7,
-                              padding: "7px 10px", borderRadius: 9, background: rowBg,
-                            }}>
-                              <Ic size={11} color={BRAND} />
-                              <span style={{ fontSize: 12, color: mu, overflow: "hidden",
-                                             textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{val}</span>
-                            </div>
-                          ) : null)}
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 10 }}>
-                          <StatusBadge active={s.status === "active"} />
-                          {s.balance !== undefined && (
-                            <span style={{ fontSize: 10, color: (s.balance || 0) < 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>
-                              {(s.balance || 0) < 0 ? "Qarzdor" : "To'lagan"}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-
-              {/* Detail panel */}
-              {detailStudent && (
-                <DetailPanel
-                  s={detailStudent}
-                  groups={groups}
-                  onEdit={openEdit}
-                  onDelete={setDeleteTarget}
-                  onClose={() => setDetailStudent(null)}
-                  D={D}
-                />
-              )}
             </div>
           )}
         </div>
+
+        {/* Full Screen Detail Panel */}
+        {detailStudent && (
+          <div onClick={() => setDetailStudent(null)} style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.65)", backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+            animation: "as-in 0.25s ease both",
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              width: "100%", maxWidth: 700, borderRadius: 28,
+              background: card, border: `1px solid ${bord}`,
+              boxShadow: "0 40px 100px rgba(0,0,0,0.40)",
+              maxHeight: "90vh", display: "flex", flexDirection: "column", overflow: "hidden",
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: "24px 28px",
+                background: `linear-gradient(135deg,${BRAND_DIM},${BRAND_L})`,
+                position: "relative",
+              }}>
+                <button className="as-btn" onClick={() => setDetailStudent(null)} style={{
+                  position: "absolute", top: 16, right: 16,
+                  width: 36, height: 36, borderRadius: 12,
+                  background: "rgba(255,255,255,0.20), backdropFilter: blur(10px)",
+                  color: "#fff",
+                }}>
+                  <X size={16} />
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <Avatar name={nameOf(detailStudent)} size={64} />
+                  <div>
+                    <p style={{ fontSize: 24, color: "#fff", fontWeight: 400, lineHeight: 1.2, marginBottom: 8 }}>
+                      {nameOf(detailStudent)}
+                    </p>
+                    <BalanceBadge balance={detailStudent.balance || 0} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div style={{ padding: "24px 28px", overflowY: "auto" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 20 }}>
+                  {[
+                    { icon: Mail, label: "Email", val: emailOf(detailStudent) },
+                    { icon: Phone, label: "Telefon", val: phoneOf(detailStudent) },
+                    { icon: BookOpen, label: "Guruh", val: detailStudent.groupId && groups ? groups.find(g => g.id === detailStudent.groupId)?.name || "—" : "—" },
+                    { icon: Wallet, label: "Balans", val: `${(detailStudent.balance || 0).toLocaleString('uz-UZ')} UZS` },
+                  ].map(({ icon: Ic, label, val }) => (
+                    <div key={label} style={{
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "14px 16px", borderRadius: 14,
+                      background: D ? "rgba(66,122,67,0.08)" : "rgba(66,122,67,0.05)",
+                      border: `1px solid ${bord}`,
+                    }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: "rgba(66,122,67,0.12)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Ic size={15} color={BRAND} />
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 10, fontWeight: 800, color: mu, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>{label}</p>
+                        <p style={{ fontSize: 14, color: tx, fontWeight: 600 }}>{val}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <StatusBadge active={detailStudent.status === "active"} />
+                </div>
+
+                {isAdmin && (
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button className="as-btn" onClick={() => { openEdit(detailStudent); setDetailStudent(null); }} style={{
+                      flex: 1, padding: "12px", borderRadius: 13,
+                      background: "rgba(66,122,67,0.10)", border: `1px solid ${BRAND}30`,
+                      fontSize: 13, fontWeight: 700, color: BRAND,
+                    }}>
+                      <Edit3 size={14} /> Tahrirlash
+                    </button>
+                    <button className="as-btn" onClick={() => { setDeleteTarget(detailStudent.id); setDetailStudent(null); }} style={{
+                      flex: 1, padding: "12px", borderRadius: 13,
+                      background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.18)",
+                      fontSize: 13, fontWeight: 700, color: "#ef4444",
+                    }}>
+                      <Trash2 size={14} /> O'chirish
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <StudentModal

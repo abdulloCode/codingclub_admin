@@ -133,7 +133,7 @@ function CodingClubLogo() {
   return (
     <div style={{ position: 'relative', width: 120, height: 120, margin: '0 auto 28px' }}>
 
-      {/* Outer orbit ring (decorative) */}
+      {/*   Outer orbit ring (decorative) */}
       <div style={{
         position: 'absolute', inset: -8, borderRadius: '50%',
         border: '1px dashed rgba(66,122,67,0.18)',

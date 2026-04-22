@@ -1,9 +1,7 @@
-import { Users, BookOpen, Calendar, DollarSign, AlertCircle, Target } from 'lucide-react';
+import { Users, Calendar, DollarSign, AlertCircle } from 'lucide-react';
 
-export default function StudentDashboardStats({ group, homeworks, attendance, payments, user, studentData, C }) {
+export default function StudentDashboardStats({ group, attendance, payments, user, studentData, C }) {
   // Calculate stats
-  const totalHomeworks = homeworks.length;
-  const submittedCount = homeworks.filter(h => h.submitted).length;
   const attendanceRate = attendance.length > 0
     ? Math.round((attendance.filter(a => a.status === 'present').length / attendance.length) * 100)
     : 0;
@@ -29,10 +27,9 @@ export default function StudentDashboardStats({ group, homeworks, attendance, pa
       </div>
 
       {/* Main stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginBottom: 24 }}>
         {[
           { label: "Guruh", value: group?.name || "—", icon: Users, color: C.blue },
-          { label: "Uy vazifalari", value: `${submittedCount}/${totalHomeworks}`, icon: BookOpen, color: C.green },
           { label: "Davomat", value: `${attendanceRate}%`, icon: Calendar, color: C.amber },
           { label: "To'lov", value: `${totalPaid.toLocaleString()} so'm`, icon: DollarSign, color: C.indigo },
         ].map(stat => (

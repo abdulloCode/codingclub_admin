@@ -5,16 +5,11 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { apiService } from '../../services/api';
 import {
   LayoutDashboard,
-  FileText,
-  Plus,
   RotateCw,
   Menu,
   Bell,
-  X,
-  ChevronRight,
   Settings,
   Calendar,
-  CheckCircle,
   Layers,
   Users,
   Wallet,
@@ -25,10 +20,9 @@ import {
 } from 'lucide-react';
 import TeacherSidebar from './components/TeacherSidebar';
 import TeacherDashboardStats from './components/TeacherDashboardStats';
-import HomeworkManager from './components/HomeworkManager';
-import HomeworkGrading from './components/HomeworkGrading';
-import AttendanceTracker from './components/AttendanceTracker';
 import GroupManager from './components/GroupManager';
+import Attendance from './Attendance';
+import LessonPayments from './components/LessonPayments';
 
 export default function TeacherPanel() {
   const navigate = useNavigate();
@@ -36,18 +30,8 @@ export default function TeacherPanel() {
   const { isDarkMode: D } = useTheme();
 
   const [active, setActive] = useState("dashboard");
-  const [selHW, setSelHW] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [homeworks, setHomeworks] = useState([]);
-  const [submissions, setSubmissions] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [attStats, setAttStats] = useState({
-    total: 0,
-    present: 0,
-    absent: 0,
-    late: 0,
-    rate: 0,
-  });
   const [balanceData, setBalanceData] = useState({
     totalBalance: 0,
     monthlyEarnings: 0,
@@ -56,19 +40,6 @@ export default function TeacherPanel() {
     lessonPrice: 0,
   });
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    groupId: "",
-    dueDate: "",
-    points: 100,
-    imageFile: null,
-    imagePreview: null,
-  });
-  const [modalLoading, setModalLoading] = useState(false);
-  const [gradeInputs, setGradeInputs] = useState({});
-  const [search, setSearch] = useState("");
 
   // ── THEME ─────────────────────────────────────────────────
   const C = {
@@ -92,22 +63,15 @@ export default function TeacherPanel() {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "attendance", label: "Davomat", icon: Calendar },
     {
-      id: "homework",
-      label: "Uy vazifalari",
-      icon: FileText,
-      badge: homeworks.length || null,
-    },
-    {
-      id: "grading",
-      label: "Baholash",
-      icon: CheckCircle,
-      badge: submissions.filter((s) => !s.graded).length || null,
-    },
-    {
       id: "groups",
       label: "Guruhlar",
       icon: Layers,
       badge: groups.length || null,
+    },
+    {
+      id: "lesson-payments",
+      label: "Dars To'lovlari",
+      icon: DollarSign,
     },
     {
       id: "balance",
@@ -117,27 +81,6 @@ export default function TeacherPanel() {
   ];
 
   // ── LOADERS ───────────────────────────────────────────────
-  const loadHomeworks = async () => {
-    try {
-      setLoading(true);
-      const d = await apiService.getHomeworks().catch(() => []);
-      setHomeworks(Array.isArray(d) ? d : d?.homeworks || d?.data || []);
-    } catch {
-      setHomeworks([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSubmissions = async (id) => {
-    try {
-      const d = await apiService.getHomeworkSubmissions(id);
-      setSubmissions(Array.isArray(d) ? d : d?.submissions || d?.data || []);
-    } catch {
-      setSubmissions([]);
-    }
-  };
-
   const loadGroups = async () => {
     try {
       // Try to get teacher groups first, fallback to all groups filtered by teacher
@@ -163,38 +106,6 @@ export default function TeacherPanel() {
     } catch (err) {
       console.error("Error loading groups:", err);
       setGroups([]);
-    }
-  };
-
-  const loadAtt = async (grps) => {
-    try {
-      const all = [];
-      for (const g of grps) {
-        try {
-          const d = await apiService.getGroupAttendanceRecords(g.id);
-          all.push(...(Array.isArray(d) ? d : d?.data || []));
-        } catch (err) {
-          console.error(`Error loading attendance for group ${g.id}:`, err);
-        }
-      }
-      const t = new Date();
-      const ts = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
-      const tod = all.filter((r) => r.date?.startsWith(ts));
-      const present = tod.filter(
-        (r) => r.status === "present" || r.status === "late",
-      ).length;
-      const absent = tod.filter((r) => r.status === "absent").length;
-      const late = tod.filter((r) => r.status === "late").length;
-      setAttStats({
-        total: tod.length,
-        present,
-        absent,
-        late,
-        rate: tod.length ? Math.round((present / tod.length) * 100) : 0,
-      });
-    } catch (err) {
-      console.error("Error loading attendance:", err);
-      setAttStats({ total: 0, present: 0, absent: 0, late: 0, rate: 0 });
     }
   };
 
@@ -232,38 +143,27 @@ export default function TeacherPanel() {
         teacherGroups = groupsDataArray.filter(group => group.teacherId === teacherIdForBalance);
       }
 
-      // Calculate lesson price based on groups
+      // Calculate lesson price and teacher earning
       let lessonPrice = 0;
-      let adminEarningPerLesson = 0;
       if (teacherGroups.length > 0) {
         const firstGroup = teacherGroups[0];
         const monthlyPrice = firstGroup.monthlyPrice || 0;
         const lessonsPerMonth = firstGroup.lessonsPerMonth || 8;
-        lessonPrice = monthlyPrice / lessonsPerMonth;
+        const fullLessonPrice = monthlyPrice / lessonsPerMonth;
 
         // Get teacher commission percentage
         const commissionPercent = teacherData?.teacher?.commissionPercentage || 20;
 
         // Calculate teacher's earning per lesson
-        const teacherEarningPerLesson = lessonPrice * (commissionPercent / 100);
-        adminEarningPerLesson = lessonPrice - teacherEarningPerLesson;
+        lessonPrice = fullLessonPrice * (commissionPercent / 100);
       }
-
-      // Get teacher commission percentage
-      const commissionPercent = teacherData?.teacher?.commissionPercentage || 20;
-
-      // Calculate teacher's earning per lesson
-      const teacherEarningPerLesson = lessonPrice * (commissionPercent / 100);
 
       setBalanceData({
         totalBalance: earningsData?.totalEarnings || 0,
         monthlyEarnings: earningsData?.monthlyEarnings || 0,
         studentPayments: earningsData?.payments || [],
         teacherPayouts: payoutData?.payouts || [],
-        lessonPrice: teacherEarningPerLesson,
-        adminEarningPerLesson: adminEarningPerLesson,
-        commissionPercent: commissionPercent,
-        fullLessonPrice: lessonPrice,
+        lessonPrice: lessonPrice,
       });
     } catch (err) {
       console.error("Error loading balance:", err);
@@ -273,91 +173,26 @@ export default function TeacherPanel() {
         studentPayments: [],
         teacherPayouts: [],
         lessonPrice: 0,
-        commissionPercent: 20,
       });
     }
   };
 
   useEffect(() => {
-    loadHomeworks();
     loadGroups();
     loadBalance();
   }, []);
 
+  // Kunlik yangilash - har 5 daqiqada bir
   useEffect(() => {
-    if (groups.length > 0) loadAtt(groups);
-  }, [groups]);
+    const interval = setInterval(() => {
+      loadGroups();
+      loadBalance();
+    }, 5 * 60 * 1000); // 5 daqiqa
+
+    return () => clearInterval(interval);
+  }, []);
 
   // ── ACTIONS ───────────────────────────────────────────────
-  const createHW = async (e) => {
-    e.preventDefault();
-    setModalLoading(true);
-    try {
-      await apiService.createHomework({
-        ...form,
-        deadline: form.dueDate,
-        maxPoints: form.points,
-      });
-      setShowModal(false);
-      setForm({
-        title: "",
-        description: "",
-        groupId: "",
-        dueDate: "",
-        points: 100,
-        imageFile: null,
-        imagePreview: null,
-      });
-      loadHomeworks();
-    } catch (err) {
-      alert("Xatolik: " + err.message);
-    } finally {
-      setModalLoading(false);
-    }
-  };
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Rasm hajmi 5MB dan katta bo'lmasligi kerak!");
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      alert("Faqat rasm fayllari yuklash mumkin!");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onloadend = () =>
-      setForm({ ...form, imageFile: file, imagePreview: reader.result });
-    reader.readAsDataURL(file);
-  };
-
-  const deleteHW = async (id, e) => {
-    e.stopPropagation();
-    if (!confirm("O'chirishni tasdiqlaysizmi?")) return;
-    try {
-      await apiService.deleteHomework(id);
-      loadHomeworks();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const grade = async (hwId, studentId, pts) => {
-    const p = parseInt(pts);
-    if (isNaN(p) || p < 0 || p > 100) {
-      alert("0–100 oraliqda ball kiriting");
-      return;
-    }
-    try {
-      await apiService.gradeHomework(hwId, { studentId, points: p });
-      loadSubmissions(hwId);
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
   const goTo = (id) => {
     setActive(id);
     setMobileOpen(false);
@@ -368,7 +203,6 @@ export default function TeacherPanel() {
     (t, g) => t + (g.students?.length || g.currentStudents || 0),
     0,
   );
-  const pendingGrade = submissions.filter((s) => !s.graded).length;
   const fmtDate = (d) =>
     d
       ? new Date(d).toLocaleDateString("uz-UZ", {
@@ -987,7 +821,7 @@ export default function TeacherPanel() {
     };
 
     const dailyPrice = calculateDailyPrice();
-    const teacherEarningPerLesson = dailyPrice * (balanceData.commissionPercent || 20) / 100;
+    const teacherEarningPerLesson = balanceData.lessonPrice || dailyPrice * 0.2;
 
     return (
       <div className="tp-fade-in">
@@ -1000,7 +834,7 @@ export default function TeacherPanel() {
         </div>
 
         {/* Stats Cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
           {[
             {
               label: "Jami balans",
@@ -1021,16 +855,10 @@ export default function TeacherPanel() {
               color: C.amber,
             },
             {
-              label: "Sizning ulush",
-              value: `${balanceData.commissionPercent || 20}%`,
+              label: "Sizning daromadingiz",
+              value: `${fmtCurrency(teacherEarningPerLesson)} so'm`,
               icon: ArrowUpRight,
               color: C.indigo,
-            },
-            {
-              label: "Admin ulushi",
-              value: `${fmtCurrency(balanceData.adminEarningPerLesson || 0)} so'm`,
-              icon: TrendingUp,
-              color: C.green,
             },
           ].map((stat, i) => (
             <div key={i} style={{
@@ -1060,30 +888,30 @@ export default function TeacherPanel() {
 
         {/* Earning Calculation */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 20, marginBottom: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 16 }}>Daromad hisobi</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 16 }}>Daromad ma'lumotlari</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
             <div>
               <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Kunlik dars narxi</p>
               <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                {fmtCurrency(balanceData.fullLessonPrice || dailyPrice)} so'm
+                {fmtCurrency(dailyPrice)} so'm
               </p>
             </div>
             <div>
-              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Komissiya foizi</p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                {balanceData.commissionPercent || 20}%
-              </p>
-            </div>
-            <div>
-              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Sizning daromadingiz</p>
+              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Sizning daromadingiz (dars boshiga)</p>
               <p style={{ fontSize: 14, fontWeight: 600, color: C.green }}>
-                {fmtCurrency(balanceData.lessonPrice)} so'm
+                {fmtCurrency(teacherEarningPerLesson)} so'm
               </p>
             </div>
             <div>
-              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Admin ulushi</p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: C.indigo }}>
-                {fmtCurrency(balanceData.adminEarningPerLesson)} so'm
+              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Jami guruhlar</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                {groups.length} ta
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Jami o'quvchilar</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                {groups.reduce((sum, g) => sum + (g.currentStudents || 0), 0)} ta
               </p>
             </div>
           </div>
@@ -1210,170 +1038,18 @@ export default function TeacherPanel() {
       </div>
 
       {/* Stats */}
-      <TeacherDashboardStats 
-        totalStudents={totalStudents} 
-        groups={groups} 
-        homeworks={homeworks} 
-        pendingGrade={pendingGrade} 
-        C={C} 
+      <TeacherDashboardStats
+        totalStudents={totalStudents}
+        groups={groups}
+        C={C}
+        teacherFinance={{
+          totalBalance: balanceData.totalBalance,
+          monthlyEarnings: balanceData.monthlyEarnings,
+          lessonPrice: balanceData.lessonPrice,
+          commissionPercent: 20, // Default commission percentage
+        }}
       />
 
-      {/* Two Column Layout */}
-      <div className="tp-two-columns">
-        {/* Recent Homeworks */}
-        <div className="tp-card">
-          <div style={{ 
-            padding: "16px 20px", 
-            borderBottom: `1px solid ${C.border}`,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8
-          }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-              So'nggi uy vazifalari
-            </p>
-            <button
-              className="tp-btn tp-btn-ghost"
-              style={{ fontSize: 12 }}
-              onClick={() => goTo("homework")}
-            >
-              Barchasini →
-            </button>
-          </div>
-          {homeworks.length === 0 ? (
-            <div className="tp-empty">
-              <FileText size={32} color={C.muted} />
-              <p style={{ fontSize: 13, color: C.muted, marginTop: 12 }}>
-                Hozircha uy vazifalari yo'q
-              </p>
-            </div>
-          ) : (
-            homeworks.slice(0, 5).map((hw) => (
-              <div
-                key={hw.id}
-                className="tp-row"
-                onClick={() => {
-                  setSelHW(hw);
-                  loadSubmissions(hw.id);
-                  goTo("grading");
-                }}
-              >
-                <div style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: `${C.blue}15`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0
-                }}>
-                  <FileText size={16} color={C.blue} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: C.text,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
-                    {hw.title}
-                  </p>
-                  <p style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                    {hw.maxPoints || hw.points || 100} ball · {fmtDate(hw.deadline || hw.dueDate)}
-                  </p>
-                </div>
-                <ChevronRight size={14} color={C.muted} />
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Groups */}
-        <div className="tp-card">
-          <div style={{ 
-            padding: "16px 20px", 
-            borderBottom: `1px solid ${C.border}`,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 8
-          }}>
-            <p style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-              Guruhlar
-            </p>
-            <button
-              className="tp-btn tp-btn-ghost"
-              style={{ fontSize: 12 }}
-              onClick={() => goTo("groups")}
-            >
-              Barchasini →
-            </button>
-          </div>
-          {groups.length === 0 ? (
-            <div className="tp-empty">
-              <Layers size={32} color={C.muted} />
-              <p style={{ fontSize: 15, fontWeight: 600, color: C.text, marginTop: 12 }}>
-                Sizga guruh tayinlanmagan
-              </p>
-              <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
-                Admin panelidan guruh biriktiring
-              </p>
-              <button
-                onClick={() => {
-                  if (window.confirm("Admin paneliga o'tmoqchimisiz?")) {
-                    window.open("/admin", "_blank");
-                  }
-                }}
-                style={{
-                  marginTop: 16,
-                  padding: "10px 20px",
-                  borderRadius: 8,
-                  background: C.indigo,
-                  border: "none",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "#fff",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8
-                }}
-              >
-                <Users size={14} /> Admin paneliga o'tish
-              </button>
-            </div>
-          ) : (
-            groups.slice(0, 5).map((g) => (
-              <div key={g.id} className="tp-row">
-                <div className="tp-avatar">
-                  {g.name?.substring(0, 2)?.toUpperCase() || "GR"}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    color: C.text,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap"
-                  }}>
-                    {g.name}
-                  </p>
-                  <p style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
-                    {g.currentStudents || 0} / {g.maxStudents || 20} o'quvchi
-                  </p>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 
@@ -1428,16 +1104,6 @@ export default function TeacherPanel() {
               </h1>
             </div>
             <div className="tp-topbar-right">
-              {active === "homework" && (
-                <button
-                  className="tp-btn tp-btn-primary"
-                  onClick={() => setShowModal(true)}
-                  style={{ padding: "6px 12px", fontSize: 12.5 }}
-                >
-                  <Plus size={14} /> 
-                  <span style={{ display: "inline-block" }}>Yangi</span>
-                </button>
-              )}
               <button
                 style={{
                   position: "relative",
@@ -1482,35 +1148,16 @@ export default function TeacherPanel() {
             ) : (
               <>
                 {active === "dashboard" && <DashboardView />}
-                {active === "attendance" && (
-                  <AttendanceTracker attStats={attStats} groups={groups} C={C} />
-                )}
-                {active === "homework" && (
-                  <HomeworkManager 
-                    homeworks={homeworks} 
-                    groups={groups} 
-                    search={search} 
-                    setSearch={setSearch} 
-                    C={C} 
-                    onSelectHomework={(hw) => { 
-                      setSelHW(hw); 
-                      loadSubmissions(hw.id); 
-                      goTo("grading"); 
-                    }} 
-                  />
-                )}
-                {active === "grading" && (
-                  <HomeworkGrading 
-                    selHW={selHW} 
-                    submissions={submissions} 
-                    groups={groups} 
-                    C={C} 
-                    onBack={() => goTo("homework")} 
-                    onGrade={(subId, score) => setGradeInputs({...gradeInputs, [subId]: score})} 
-                  />
-                )}
+                {active === "attendance" && <Attendance groups={groups} C={C} user={user} />}
                 {active === "groups" && (
                   <GroupManager groups={groups} courses={[]} rooms={[]} C={C} />
+                )}
+                {active === "lesson-payments" && (
+                  <LessonPayments
+                    groups={groups}
+                    C={C}
+                    user={user}
+                  />
                 )}
                 {active === "balance" && (
                   <BalanceView
@@ -1525,214 +1172,6 @@ export default function TeacherPanel() {
           </div>
         </div>
       </div>
-
-      {/* Create Homework Modal */}
-      {showModal && (
-        <div className="tp-modal-overlay">
-          <div className="tp-modal">
-            <div style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 20,
-              paddingBottom: 16,
-              borderBottom: `1px solid ${C.border}`,
-            }}>
-              <div>
-                <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>
-                  Yangi uy vazifasi
-                </h3>
-                <p style={{ fontSize: 13, color: C.muted, marginTop: 2 }}>
-                  O'quvchilarga topshiriq bering
-                </p>
-              </div>
-              <button
-                className="tp-btn tp-btn-ghost"
-                onClick={() => setShowModal(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={createHW} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div>
-                <label className="tp-label">Sarlavha *</label>
-                <input
-                  required
-                  className="tp-input"
-                  placeholder="Uy vazifasi nomi..."
-                  value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
-                />
-              </div>
-              
-              <div>
-                <label className="tp-label">Tavsif *</label>
-                <textarea
-                  required
-                  className="tp-input"
-                  placeholder="Batafsil ko'rsatma..."
-                  style={{ minHeight: 80, resize: "vertical" }}
-                  value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
-                />
-              </div>
-              
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 12
-              }}>
-                <div>
-                  <label className="tp-label">Guruh *</label>
-                  <select
-                    required
-                    className="tp-input"
-                    value={form.groupId}
-                    onChange={(e) => setForm({ ...form, groupId: e.target.value })}
-                  >
-                    <option value="">Tanlang</option>
-                    {groups.map((g) => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="tp-label">Muddat *</label>
-                  <input
-                    required
-                    type="date"
-                    className="tp-input"
-                    value={form.dueDate}
-                    onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="tp-label">Maksimum ball</label>
-                  <input
-                    required
-                    type="number"
-                    min="0"
-                    max="100"
-                    className="tp-input"
-                    value={form.points}
-                    onChange={(e) => setForm({
-                      ...form,
-                      points: parseInt(e.target.value) || 100,
-                    })}
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="tp-label">Rasm (ixtiyoriy)</label>
-                {form.imagePreview ? (
-                  <div style={{ position: "relative", marginTop: 8 }}>
-                    <img
-                      src={form.imagePreview}
-                      alt="Preview"
-                      style={{
-                        width: "100%",
-                        height: 180,
-                        objectFit: "cover",
-                        borderRadius: 8,
-                        border: `1px solid ${C.border}`,
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setForm({
-                        ...form,
-                        imageFile: null,
-                        imagePreview: null,
-                      })}
-                      style={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        padding: 6,
-                        borderRadius: "50%",
-                        background: "rgba(0,0,0,0.7)",
-                        color: "#fff",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{
-                    marginTop: 8,
-                    padding: 24,
-                    border: `2px dashed ${C.border}`,
-                    borderRadius: 8,
-                    textAlign: "center",
-                    cursor: "pointer",
-                  }}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      style={{ display: "none" }}
-                      id="tp-img-upload"
-                    />
-                    <label htmlFor="tp-img-upload" style={{ cursor: "pointer" }}>
-                      <div style={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        background: D ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        margin: "0 auto 12px",
-                      }}>
-                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.text} strokeWidth={2}>
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="17,8 12,3 7,8" />
-                          <line x1="12" y1="3" x2="12" y2="15" />
-                        </svg>
-                      </div>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: C.text, margin: 0 }}>
-                        Rasm yuklash
-                      </p>
-                      <p style={{ fontSize: 12, color: C.muted, margin: "4px 0 0 0" }}>
-                        PNG, JPG, GIF (max 5MB)
-                      </p>
-                    </label>
-                  </div>
-                )}
-              </div>
-              
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="tp-btn tp-btn-outline"
-                  style={{ flex: 1, justifyContent: "center" }}
-                  onClick={() => setShowModal(false)}
-                >
-                  Bekor
-                </button>
-                <button
-                  type="submit"
-                  disabled={modalLoading}
-                  className="tp-btn tp-btn-primary"
-                  style={{ flex: 2, justifyContent: "center", opacity: modalLoading ? 0.6 : 1 }}
-                >
-                  {modalLoading ? (
-                    <>
-                      <RotateCw size={14} className="tp-spin" /> Saqlanmoqda…
-                    </>
-                  ) : (
-                    "Yaratish"
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </>
   );
 }

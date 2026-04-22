@@ -6,7 +6,7 @@ import { apiService } from '../../services/api';
 import {
   BarChart3, Download, Calendar, DollarSign,
   TrendingUp, TrendingDown, Users, Layers,
-  FileText, RefreshCw, Filter, X
+  FileText, RefreshCw, Filter, X, Plus, CreditCard
 } from 'lucide-react';
 
 export default function Reports() {
@@ -282,6 +282,25 @@ export default function Reports() {
               <RefreshCw size={16} />
               Yangilash
             </button>
+            <button
+              onClick={() => window.location.href = '/admin-payments'}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 20px',
+                borderRadius: 10,
+                background: `linear-gradient(135deg, ${C.primary}20, ${C.primaryLight}20)`,
+                border: `1px solid ${C.primary}`,
+                color: C.primary,
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: 600
+              }}
+            >
+              <Plus size={16} />
+              To'lov qilish
+            </button>
           </div>
         </div>
 
@@ -360,7 +379,7 @@ export default function Reports() {
         <div style={{ display: 'flex', gap: 8, borderBottom: `1px solid ${C.border}`, paddingBottom: 16 }}>
           {[
             { id: 'overview', label: 'Umumiy', icon: BarChart3 },
-            { id: 'payments', label: 'To\'lovlar', icon: DollarSign },
+            { id: 'payments', label: 'To\'lovlar tarixi', icon: DollarSign },
             { id: 'teachers', label: 'O\'qituvchilar', icon: Users },
             { id: 'students', label: 'Talabalar', icon: Layers }
           ].map(tab => {

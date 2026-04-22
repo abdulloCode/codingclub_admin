@@ -2,102 +2,220 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Mobile-first: Hide scrollbars on mobile devices */
+/* ─────────────────────────────────────────────────────────────
+   GLOBAL STYLES & DESIGN SYSTEM
+   Premium styling for the entire application
+──────────────────────────────────────────────────────────────── */
+
+/* ─── BASE STYLES ───────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #f8fafc;
+  overflow-x: hidden;
+}
+
+/* Dark mode styles */
+.dark body {
+  color: #f4f4f5;
+  background: #0a0a0c;
+}
+
+/* ─── SCROLLBAR STYLING ───────────────────────────────────────── */
+/* Desktop scrollbar */
+@media (min-width: 1025px) {
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Mobile: Hide scrollbars */
 @media (max-width: 1024px) {
-  /* Hide scrollbars for Chrome, Safari and Opera */
   *::-webkit-scrollbar {
     display: none;
   }
 
-  /* Hide scrollbar for IE, Edge and Firefox */
   * {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-  }
-
-  /* Ensure content fits without scrolling */
-  html, body {
-    overflow-x: hidden;
-  }
-
-  /* Full width containers on mobile */
-  .w-full-mobile {
-    width: 100%;
-  }
-
-  /* Hide large screens specific elements */
-  .hidden-mobile {
-    display: none !important;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
-/* Mobile responsive base styles */
+/* ─── RESPONSIVE TYPOGRAPHY ───────────────────────────────────── */
 @media (max-width: 768px) {
-  html, body {
-    font-size: 14px;
-  }
-
-  /* Ensure full width on mobile */
-  .container {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-
-  /* Compact padding for mobile */
-  .mobile-compact {
-    padding: 1rem;
-  }
-
-  /* Adjust text sizes */
+  html { font-size: 14px; }
   h1 { font-size: 1.5rem; }
   h2 { font-size: 1.25rem; }
   h3 { font-size: 1.1rem; }
 }
 
-/* Small mobile devices */
 @media (max-width: 480px) {
-  html, body {
-    font-size: 13px;
-  }
-
-  .container {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-  }
-
-  .mobile-compact {
-    padding: 0.75rem;
-  }
-
+  html { font-size: 13px; }
   h1 { font-size: 1.25rem; }
   h2 { font-size: 1.1rem; }
   h3 { font-size: 1rem; }
 }
 
-/* Tablet devices */
-@media (min-width: 769px) and (max-width: 1024px) {
-  html, body {
-    font-size: 15px;
+/* ─── PREMIUM ANIMATIONS ───────────────────────────────────────── */
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-
-  .container {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-}
-
-/* Touch-friendly tap highlights */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Smooth scrolling for desktop, disable for mobile */
-@media (min-width: 1025px) {
-  html {
-    scroll-behavior: smooth;
+  to {
+    opacity: 1;
   }
 }
 
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+.dark .animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Spin animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Bounce animation */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+    animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+  }
+  50% {
+    transform: translateY(-10px);
+    animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+/* Blob animation for backgrounds */
 @keyframes blob {
   0%, 100% {
     transform: translate(0, 0) scale(1);
@@ -124,3 +242,211 @@
 .animation-delay-4000 {
   animation-delay: 4s;
 }
+
+/* ─── GLASSMORPHISM EFFECTS ─────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.dark .glass {
+  background: rgba(20, 20, 25, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .glass-strong {
+  background: rgba(20, 20, 25, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ─── GRADIENT BACKGROUNDS ───────────────────────────────────────── */
+.gradient-brand {
+  background: linear-gradient(135deg, #427A43 0%, #5a9e5b 100%);
+}
+
+.gradient-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
+}
+
+.gradient-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+}
+
+.gradient-error {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+}
+
+.gradient-mesh {
+  background:
+    radial-gradient(at 0% 0%, rgba(66, 122, 67, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(90, 158, 91, 0.15) 0px, transparent 50%);
+}
+
+/* ─── UTILITY CLASSES ──────────────────────────────────────────── */
+/* Touch-friendly tap highlights */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Smooth scrolling */
+@media (min-width: 1025px) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Focus visible styles */
+:focus-visible {
+  outline: 2px solid rgba(66, 122, 67, 0.5);
+  outline-offset: 2px;
+}
+
+.dark :focus-visible {
+  outline-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Selection styles */
+::selection {
+  background: rgba(66, 122, 67, 0.2);
+  color: inherit;
+}
+
+.dark ::selection {
+  background: rgba(90, 158, 91, 0.3);
+}
+
+/* ─── RESPONSIVE UTILITIES ─────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .w-full-mobile {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1025px) {
+  .hide-desktop {
+    display: none !important;
+  }
+}
+
+/* ─── TRANSITION UTILITIES ─────────────────────────────────────── */
+.transition-all {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-colors {
+  transition:
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.transition-transform {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── HOVER EFFECTS ────────────────────────────────────────────── */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.dark .hover-lift:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── LOADING STATES ────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 0%,
+    rgba(0, 0, 0, 0.1) 50%,
+    rgba(0, 0, 0, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* ─── ACCESSIBILITY ────────────────────────────────────────────── */
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .glass,
+  .glass-strong {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* ─── PRINT STYLES ─────────────────────────────────────────────── */
+@media print {
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a,
+  a:visited {
+    text-decoration: underline;
+  }
+
+  pre,
+  blockquote {
+    border: 1px solid #999;
+    page-break-inside: avoid;
+  }
+
+  img {
+    page-break-inside: avoid;
+  }
+
+  h1,
+  h2,
+  h3 {
+    page-break-after: avoid;
+  }
+}
+

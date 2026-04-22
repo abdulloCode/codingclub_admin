@@ -1,6 +1,55 @@
-import { Users, Layers, FileText, AlertCircle } from 'lucide-react';
+import { Users, Layers, XCircle, Wallet, TrendingUp, DollarSign, ArrowUpRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { apiService } from '../../../services/api';
 
-export default function TeacherDashboardStats({ totalStudents, groups, homeworks, pendingGrade, C }) {
+export default function TeacherDashboardStats({ totalStudents, groups, C, teacherFinance }) {
+  const [absentToday, setAbsentToday] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAbsentStudents = async () => {
+      try {
+        setLoading(true);
+        const today = new Date().toISOString().split('T')[0];
+        let totalAbsent = 0;
+
+        // Har bir guruh uchun bugungi kelmaganlarni sanash
+        for (const group of groups) {
+          try {
+            const attendance = await apiService.getAttendances({
+              groupId: group.id,
+              date: today
+            });
+
+            const records = Array.isArray(attendance) ? attendance : (attendance?.data || []);
+            const attendanceData = records.flatMap(r => r.attendanceData || []);
+
+            // Bu guruhdagi kelmaganlar
+            const absentInGroup = attendanceData.filter(a => a.status === 'absent').length;
+            totalAbsent += absentInGroup;
+          } catch (err) {
+            console.error(`Error loading attendance for group ${group.id}:`, err);
+          }
+        }
+
+        setAbsentToday(totalAbsent);
+      } catch (err) {
+        console.error("Error loading absent students:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (groups.length > 0) {
+      loadAbsentStudents();
+    } else {
+      setLoading(false);
+    }
+  }, [groups]);
+
+  // Format currency helper
+  const fmtCurrency = (n) => new Intl.NumberFormat('uz-UZ').format(n ?? 0);
+
   const stats = [
     {
       label: "O'quvchilar",
@@ -10,26 +59,42 @@ export default function TeacherDashboardStats({ totalStudents, groups, homeworks
       color: C.blue,
     },
     {
-      label: "Guruhlar",
-      value: groups.length,
-      sub: "Jami",
-      icon: Layers,
-      color: C.green,
-    },
-    {
-      label: "Uy vazifalari",
-      value: homeworks.length,
-      sub: "Jami",
-      icon: FileText,
-      color: C.amber,
-    },
-    {
-      label: "Baholash",
-      value: pendingGrade,
-      sub: "Kutilmoqda",
-      icon: AlertCircle,
+      label: "Kelmagan",
+      value: loading ? "..." : absentToday,
+      sub: "Bugun",
+      icon: XCircle,
       color: C.red,
     },
+    ...(teacherFinance ? [
+      {
+        label: "Jami balans",
+        value: `${fmtCurrency(teacherFinance.totalBalance)} so'm`,
+        sub: "Sizning daromadingiz",
+        icon: Wallet,
+        color: C.green,
+      },
+      {
+        label: "Oylik daromad",
+        value: `${fmtCurrency(teacherFinance.monthlyEarnings)} so'm`,
+        sub: "Bu oy",
+        icon: TrendingUp,
+        color: C.indigo,
+      },
+      {
+        label: "Dars narxi",
+        value: `${fmtCurrency(teacherFinance.lessonPrice)} so'm`,
+        sub: "Bir dars uchun",
+        icon: DollarSign,
+        color: C.amber,
+      },
+      {
+        label: "Sizning ulushi",
+        value: `${teacherFinance.commissionPercent || 20}%`,
+        sub: "Komissiya",
+        icon: ArrowUpRight,
+        color: C.blue,
+      },
+    ] : []),
   ];
 
   return (
@@ -37,7 +102,7 @@ export default function TeacherDashboardStats({ totalStudents, groups, homeworks
       className="tp-stat-grid"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(4,1fr)",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
         gap: 12,
       }}
     >
